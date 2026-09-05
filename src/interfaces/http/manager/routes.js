@@ -8,6 +8,10 @@ import {
   updateTierSchema,
   updateCategorySchema,
   updateApprovalPolicySchema,
+  invoiceIdParams,
+  invoiceListQuerySchema,
+  listQuerySchema,
+  reportQuerySchema,
 } from './schemas.js';
 
 import * as quotationsSvc from '../../../domains/quotations/service.js';
@@ -21,6 +25,8 @@ import * as dealHealthRepo from '../../../domains/deal-health/repository.js';
 import { NotFoundError } from '../../../shared/http/errors.js';
 import { getFulfillmentOrder, previewFulfillmentPlan } from '../../../domains/finance/fulfillment/service.js';
 import { fulfillmentOrderIdParams, quoteIdParams } from '../fulfillment.schemas.js';
+import { getFulfillmentOrders, getInvoiceDetail, getInvoices, getReportSummary } from '../../../domains/finance/read-model.service.js';
+import { AppError } from '../../../shared/http.js';
 
 export const managerRouter = Router();
 
@@ -35,6 +41,25 @@ managerRouter.get('/fulfillment/quotes/:quoteId/suggestion', requireAuthenticati
 });
 managerRouter.get('/fulfillment/orders/:fulfillmentOrderId', requireAuthentication, requireCurrentRole('sales_manager', 'finance_operations', 'admin'), validateCurrent(fulfillmentOrderIdParams, 'params'), async (req, res, next) => {
   try { res.json({ data: await getFulfillmentOrder({ fulfillmentOrderId: req.validated.params.fulfillmentOrderId }) }); } catch (err) { next(err); }
+});
+managerRouter.get('/fulfillment/orders', requireAuthentication, requireCurrentRole('sales_manager', 'finance_operations', 'admin'), validateCurrent(listQuerySchema, 'query'), async (req, res, next) => {
+  try { res.json({ data: await getFulfillmentOrders({ limit: req.validated.query.limit ?? 50, offset: req.validated.query.offset ?? 0 }) }); } catch (err) { next(err); }
+});
+
+// Read-only financial views for the internal workspace. Finance mutations remain
+// under /finance, while Managers can safely render list/detail screens.
+managerRouter.get('/invoices', requireAuthentication, requireCurrentRole('sales_manager', 'finance_operations', 'admin'), validateCurrent(invoiceListQuerySchema, 'query'), async (req, res, next) => {
+  try { res.json({ data: await getInvoices({ limit: req.validated.query.limit ?? 50, offset: req.validated.query.offset ?? 0, status: req.validated.query.status }) }); } catch (err) { next(err); }
+});
+managerRouter.get('/invoices/:invoiceId', requireAuthentication, requireCurrentRole('sales_manager', 'finance_operations', 'admin'), validateCurrent(invoiceIdParams, 'params'), async (req, res, next) => {
+  try {
+    const invoice = await getInvoiceDetail(req.validated.params.invoiceId);
+    if (!invoice) throw new AppError(404, 'INVOICE_NOT_FOUND', 'Invoice was not found.');
+    res.json({ data: invoice });
+  } catch (err) { next(err); }
+});
+managerRouter.get('/reports', requireAuthentication, requireCurrentRole('sales_manager', 'finance_operations', 'admin'), validateCurrent(reportQuerySchema, 'query'), async (req, res, next) => {
+  try { res.json({ data: await getReportSummary(req.validated.query) }); } catch (err) { next(err); }
 });
 
 // ─── Config: tiers ───────────────────────────────────────────────────────────
