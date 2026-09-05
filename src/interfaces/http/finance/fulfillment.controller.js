@@ -4,7 +4,8 @@
 
 import {
   allocateFulfillment,
-  previewFulfillmentPlan
+  previewFulfillmentPlan,
+  consolidateBackorders
 } from '../../../domains/finance/fulfillment/service.js';
 import { asyncHandler } from './middleware.js';
 import { parse, allocateParams, allocateBody } from './schemas.js';
@@ -27,5 +28,14 @@ export const allocateFulfillmentController = asyncHandler(async (req, res) => {
     principal: req.principal
   });
 
+  res.status(200).json({ data: result });
+});
+
+export const consolidateBackordersController = asyncHandler(async (req, res) => {
+  const params = parse(allocateParams, req.params);
+  const result = await consolidateBackorders({
+    quotationId: params.quotationId,
+    principal: req.principal
+  });
   res.status(200).json({ data: result });
 });

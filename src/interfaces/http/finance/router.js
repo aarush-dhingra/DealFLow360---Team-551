@@ -9,7 +9,11 @@
 import { Router } from 'express';
 import { requireFinance, requireFinanceOrManager, errorHandler } from './middleware.js';
 import { decideApprovalController } from './approval.controller.js';
-import { previewPlanController, allocateFulfillmentController } from './fulfillment.controller.js';
+import {
+  previewPlanController,
+  allocateFulfillmentController,
+  consolidateBackordersController
+} from './fulfillment.controller.js';
 
 export const financeRouter = Router();
 
@@ -30,6 +34,12 @@ financeRouter.post(
   '/fulfillment/quotations/:quotationId/allocate',
   requireFinance,
   allocateFulfillmentController
+);
+
+financeRouter.post(
+  '/fulfillment/quotations/:quotationId/consolidate-backorders',
+  requireFinance,
+  consolidateBackordersController
 );
 
 // Keep the error envelope local to finance routes.

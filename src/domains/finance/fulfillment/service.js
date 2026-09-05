@@ -20,6 +20,7 @@ import { withTransaction } from '../../../infrastructure/database/transaction.js
 import { AuditCollector } from '../../../infrastructure/events/audit.js';
 import { OutboxCollector } from '../../../infrastructure/events/outbox.js';
 import { Errors } from '../../../shared/errors.js';
+import { subtract, compare, add } from '../../../shared/money.js';
 import { buildAvailabilityMap, suggestAllocations, canAllocate } from './planning.js';
 import { validateManualAllocation } from './allocation.js';
 import * as repo from './repository.js';
@@ -214,6 +215,135 @@ async function writeAudit(
   });
   await audit.flush();
   await outbox.flush();
+}
+
+/**
+ * Re-attempt fulfillment of the order's backordered allocations against the
+ * current live stock. Existing 'allocated' rows and their stock reservations
+ * are never cancelled or released — only the still-backordered rows are
+ * reduced or completed, and any newly covered quantity is reserved and written
+ * as an allocated allocation.
+ */
+export async function consolidateBackorders({ quotationId, principal }) {
+  if (!quotationId || typeof quotationId !== 'string') {
+    throw Errors.validation('quotationId is required');
+  }
+  return withTransaction(async (client) => {
+    const quote = await repo.findQuote(client, quotationId);
+    if (!quote) throw Errors.notFound('Quotation not found.');
+
+    const liveOrder = await repo.findLiveOrder(client, quotationId);
+    if (!liveOrder) throw Errors.invalidTransition('No live fulfillment order to consolidate.');
+    const order = await repo.lockOrder(client, liveOrder.id);
+    if (!order) throw Errors.staleVersion('Fulfillment order changed concurrently.');
+
+    const warehouses = await repo.findWarehouses(client);
+    let backorders = await repo.findBackorders(client, order.id);
+    if (backorders.length === 0) {
+      return { quotationId, fulfillmentOrderId: order.id, consolidated: 0, remainingBackorders: 0 };
+    }
+
+    let consolidatedQty = '0';
+    let consolidatedRows = 0;
+    for (const backorder of backorders) {
+      let remaining = backorder.quantity;
+
+      // Repeatedly allocate what the current stock can cover; re-read inventory
+      // after each reservation so we never double-book.
+      for (;;) {
+        if (compare(remaining, '0') === 0) break;
+        const inventory = await repo.findInventory(client);
+        const plan = suggestAllocations({
+          lines: [
+            {
+              quotationLineId: backorder.quotationLineId,
+              productId: backorder.productId,
+              quantity: remaining
+            }
+          ],
+          inventory,
+          warehouses
+        });
+        const coverable = plan.allocations.filter((a) => a.status === 'allocated');
+        if (coverable.length === 0) break;
+
+        for (const alloc of coverable) {
+          const ok = await repo.reserveStock(client, {
+            warehouseId: alloc.warehouseId,
+            productId: alloc.productId,
+            quantity: alloc.quantity
+          });
+          if (!ok) throw Errors.insufficientStock('Stock changed concurrently; reload and retry.');
+          await repo.insertAllocation(client, {
+            fulfillmentOrderId: order.id,
+            quotationLineId: backorder.quotationLineId,
+            warehouseId: alloc.warehouseId,
+            quantity: alloc.quantity,
+            status: 'allocated'
+          });
+          consolidatedQty = add(consolidatedQty, alloc.quantity);
+          consolidatedRows += 1;
+          remaining = subtract(remaining, alloc.quantity);
+        }
+      }
+
+      // Close or shrink the original backorder row.
+      const coveredNow = subtract(backorder.quantity, remaining);
+      if (compare(coveredNow, '0') !== 0) {
+        const outcome =
+          compare(coveredNow, backorder.quantity) >= 0
+            ? { quantity: backorder.quantity, status: 'cancelled' }
+            : { quantity: remaining, status: 'backordered' };
+        await repo.updateAllocation(client, {
+          id: backorder.id,
+          fulfillmentOrderId: order.id,
+          quantity: outcome.quantity,
+          status: outcome.status
+        });
+      }
+    }
+
+    // Recompute order state from the remaining backorders.
+    backorders = (await repo.findBackorders(client, order.id)).filter((b) => compare(b.quantity, '0') > 0);
+    const orderStatus = backorders.length > 0 ? 'backordered' : 'allocated';
+    await repo.updateOrderState(client, {
+      id: order.id,
+      status: orderStatus,
+      allocationMode: order.allocationMode
+    });
+
+    const audit = new AuditCollector(client);
+    const outbox = new OutboxCollector(client);
+    const now = new Date().toISOString();
+    audit.record({
+      aggregateType: 'fulfillment_order',
+      aggregateId: order.id,
+      quotationId,
+      eventType: 'fulfillment.backorder_consolidated',
+      actorUserId: principal.userId,
+      requestId: principal.requestId ?? null,
+      beforeState: { orderStatus: 'backordered' },
+      afterState: { orderStatus, consolidatedQty, consolidatedRows, remainingBackorders: backorders.length },
+      metadata: { at: now }
+    });
+    outbox.record({
+      aggregateType: 'fulfillment_order',
+      aggregateId: order.id,
+      eventType: 'fulfillment.backorder_consolidated',
+      payload: { quotationId, orderId: order.id, consolidatedQty, consolidatedRows, orderStatus, at: now }
+    });
+    await audit.flush();
+    await outbox.flush();
+
+    return {
+      quotationId,
+      fulfillmentOrderId: order.id,
+      consolidatedQty,
+      consolidatedRows,
+      remainingBackorders: backorders.length,
+      orderStatus
+    };
+  });
 }
 
 function summarize(orderId, quote, plan, mode, quoteStatus) {

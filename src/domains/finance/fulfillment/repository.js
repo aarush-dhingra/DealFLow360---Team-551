@@ -137,6 +137,31 @@ const SELECT_ALLOCATIONS = `
   ORDER BY fa.id
 `;
 
+// Backordered allocations of an order, mapped to their product.
+const SELECT_BACKORDERS = `
+  SELECT fa.id,
+         fa.fulfillment_order_id AS "fulfillmentOrderId",
+         fa.quotation_line_id    AS "quotationLineId",
+         ql.product_id           AS "productId",
+         fa.warehouse_id         AS "warehouseId",
+         fa.quantity
+  FROM fulfillment_allocations fa
+  JOIN quotation_lines ql ON ql.id = fa.quotation_line_id
+  WHERE fa.fulfillment_order_id = $1
+    AND fa.status = 'backordered'
+  ORDER BY fa.id
+`;
+
+// Update an allocation row's quantity/status.
+const UPDATE_ALLOCATION = `
+  UPDATE fulfillment_allocations
+  SET quantity = $3,
+      status = $4
+  WHERE id = $1
+    AND fulfillment_order_id = $2
+  RETURNING id
+`;
+
 const CANCEL_ALLOCATION = `
   UPDATE fulfillment_allocations
   SET status = 'cancelled'
@@ -228,5 +253,20 @@ export async function findOrderAllocations(client, fulfillmentOrderId) {
 
 export async function cancelAllocation(client, allocationId) {
   const { rows } = await client.query(CANCEL_ALLOCATION, [allocationId]);
+  return rows[0] ?? null;
+}
+
+export async function findBackorders(client, fulfillmentOrderId) {
+  const { rows } = await client.query(SELECT_BACKORDERS, [fulfillmentOrderId]);
+  return rows;
+}
+
+export async function updateAllocation(client, { id, fulfillmentOrderId, quantity, status }) {
+  const { rows } = await client.query(UPDATE_ALLOCATION, [
+    id,
+    fulfillmentOrderId,
+    quantity,
+    status
+  ]);
   return rows[0] ?? null;
 }
