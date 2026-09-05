@@ -3,7 +3,7 @@ import { authRouter } from './modules/identity/auth.router.js';
 import { adminRouter } from './interfaces/http/admin/admin.routes.js';
 import { quoteRouter } from './interfaces/http/sales-rep/sales-rep.routes.js';
 import { managerRouter } from './interfaces/http/manager/routes.js';
-import { financeRouter } from './interfaces/http/finance/routes.js';
+import { financeRouter } from './interfaces/http/finance/router.js';
 import { customerPortalRouter } from './interfaces/http/customer-portal/routes.js';
 
 export const apiRouter = Router();
