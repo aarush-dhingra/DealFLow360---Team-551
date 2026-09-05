@@ -8,7 +8,7 @@
  *   - reserves stock with guarded updates (never over-allocates),
  *   - writes allocation rows (allocated/backordered),
  *   - on the initial suggested allocation advances the quote to
- *     in_fulfillment (or partially_fulfilled when any backorder remains),
+ *     in_fulfillment while the order tracks any remaining backorders,
  *   - writes audit + outbox rows atomically.
  *
  * Duplicate live fulfillment orders are prevented by the partial unique index
@@ -135,7 +135,7 @@ export async function allocateFulfillment({ quotationId, mode, manualAllocations
     plan = suggestAllocations({ lines, inventory, warehouses });
 
     const hasBackorder = plan.allocations.some((a) => a.status === 'backordered');
-    const quoteStatusAfter = hasBackorder ? 'partially_fulfilled' : 'in_fulfillment';
+    const quoteStatusAfter = 'in_fulfillment';
 
     await persistAllocations(client, created.id, plan.allocations);
     await repo.updateOrderState(client, {
@@ -357,4 +357,14 @@ function summarize(orderId, quote, plan, mode, quoteStatus) {
     shippingCostTotal: plan.shippingCostTotal,
     allocations: plan.allocations
   };
+}
+
+/** Read a fulfillment order and its allocation/backorder rows for Manager views. */
+export async function getFulfillmentOrder({ fulfillmentOrderId }) {
+  return withTransaction(async (client) => {
+    const order = await repo.findOrder(client, fulfillmentOrderId);
+    if (!order) throw Errors.notFound('Fulfillment order not found.');
+    const allocations = await repo.findOrderAllocations(client, fulfillmentOrderId);
+    return { ...order, allocations };
+  });
 }

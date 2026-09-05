@@ -7,6 +7,7 @@
  */
 
 import { Router } from 'express';
+import { requireAuthentication } from '../../../modules/identity/auth.middleware.js';
 import { requireFinance, requireFinanceOrManager, errorHandler } from './middleware.js';
 import { decideApprovalController } from './approval.controller.js';
 import {
@@ -21,6 +22,8 @@ import {
 } from './credit-notes.controller.js';
 
 export const financeRouter = Router();
+
+financeRouter.use(requireAuthentication);
 
 financeRouter.post(
   '/quotations/:quotationId/approvals/:approvalInstanceId/decisions',

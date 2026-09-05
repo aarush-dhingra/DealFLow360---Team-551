@@ -41,10 +41,15 @@ const moneyString = z
   .string()
   .regex(/^\d+(\.\d+)?$/, 'quantity must be a decimal string');
 
+const positiveMoneyString = moneyString.refine(
+  (value) => !/^0+(\.0+)?$/.test(value),
+  'amount must be greater than zero'
+);
+
 export const manualAllocationItem = z.object({
   quotationLineId: z.string().uuid(),
   warehouseId: z.string().uuid(),
-  quantity: moneyString
+  quantity: positiveMoneyString
 });
 
 export const allocateBody = z
@@ -74,13 +79,13 @@ export const invoiceParams = z.object({
 });
 
 export const applyPaymentBody = z.object({
-  amount: moneyString.refine((v) => Number(v) > 0, 'amount must be greater than zero'),
+  amount: positiveMoneyString,
   method: z.string().trim().min(1),
   externalReference: z.string().trim().max(200).optional()
 });
 
 export const issueCreditNoteBody = z.object({
-  amount: moneyString.refine((v) => Number(v) > 0, 'amount must be greater than zero'),
+  amount: positiveMoneyString,
   reason: z.string().trim().min(1)
 });
 

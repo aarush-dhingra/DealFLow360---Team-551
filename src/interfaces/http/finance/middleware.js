@@ -3,14 +3,14 @@
  *
  * Authorization is adapted to the authenticated request.principal set by the
  * application identity layer (no header-based dev authentication here):
- *   request.principal = { userId, roles: ['finance_operations', ...], ... }
+ *   request.principal = { id, roles: ['finance_operations', ...], ... }
  */
 
 import { Errors } from '../../../shared/errors.js';
 
 /** Require an authenticated principal. */
 export function requirePrincipal(req, _res, next) {
-  if (!req.principal?.userId) {
+  if (!principalUserId(req.principal)) {
     return next(Errors.unauthorized());
   }
   return next();
@@ -19,7 +19,7 @@ export function requirePrincipal(req, _res, next) {
 /** Require the principal to hold at least one of the given roles. */
 export function requireAnyRole(...roles) {
   return (req, _res, next) => {
-    if (!req.principal?.userId) return next(Errors.unauthorized());
+    if (!principalUserId(req.principal)) return next(Errors.unauthorized());
     const allowed = req.principal.roles ?? [];
     if (!roles.some((role) => allowed.includes(role))) {
       return next(Errors.forbidden(`Requires one of roles: ${roles.join(', ')}`));
@@ -29,10 +29,26 @@ export function requireAnyRole(...roles) {
 }
 
 /** Finance/Operations role guard for Finance-owned mutations. */
-export const requireFinance = requireAnyRole('finance_operations');
+export const requireFinance = requireAnyRole('finance_operations', 'admin');
 
 /** Manager may view finance read surfaces but not mutate them. */
-export const requireFinanceOrManager = requireAnyRole('finance_operations', 'sales_manager');
+export const requireFinanceOrManager = requireAnyRole('finance_operations', 'sales_manager', 'admin');
+
+/**
+ * Adapt the identity module's authenticated principal to the Finance domain
+ * actor contract without exposing HTTP request details to domain services.
+ */
+export function financePrincipal(req) {
+  return {
+    userId: principalUserId(req.principal),
+    roles: req.principal.roles ?? [],
+    requestId: req.id
+  };
+}
+
+function principalUserId(principal) {
+  return principal?.id ?? principal?.userId;
+}
 
 /**
  * Wrap an async route handler so rejected promises reach the error middleware.

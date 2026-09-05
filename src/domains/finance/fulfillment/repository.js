@@ -62,6 +62,17 @@ const SELECT_LIVE_ORDER = `
   LIMIT 1
 `;
 
+const SELECT_ORDER = `
+  SELECT id,
+         quotation_id AS "quotationId",
+         status,
+         allocation_mode AS "allocationMode",
+         created_at AS "createdAt",
+         updated_at AS "updatedAt"
+  FROM fulfillment_orders
+  WHERE id = $1
+`;
+
 // Lock the live order row while re-allocating (manual override / consolidation).
 const LOCK_ORDER = `
   SELECT id,
@@ -197,6 +208,11 @@ export async function lockQuote(client, quotationId) {
 
 export async function findLiveOrder(client, quotationId) {
   const { rows } = await client.query(SELECT_LIVE_ORDER, [quotationId]);
+  return rows[0] ?? null;
+}
+
+export async function findOrder(client, fulfillmentOrderId) {
+  const { rows } = await client.query(SELECT_ORDER, [fulfillmentOrderId]);
   return rows[0] ?? null;
 }
 

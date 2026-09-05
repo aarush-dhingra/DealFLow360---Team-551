@@ -4,7 +4,7 @@
  */
 
 import { decideApproval } from '../../../domains/finance/approval/service.js';
-import { asyncHandler } from './middleware.js';
+import { asyncHandler, financePrincipal } from './middleware.js';
 import { parse, approvalDecisionParams, approvalDecisionBody } from './schemas.js';
 
 export const decideApprovalController = asyncHandler(async (req, res) => {
@@ -16,7 +16,7 @@ export const decideApprovalController = asyncHandler(async (req, res) => {
     approvalInstanceId: params.approvalInstanceId,
     action: body.action,
     reason: body.reason,
-    principal: req.principal
+    principal: financePrincipal(req)
   });
 
   res.status(200).json({ data: result });
