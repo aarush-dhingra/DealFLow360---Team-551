@@ -28,7 +28,7 @@ export async function login(request, response, next) {
       data: {
         accessToken: token,
         expiresAt,
-        user: { id: user.id, email: user.email, displayName: user.display_name, roles: user.roles }
+        user: { id: user.id, email: user.email, displayName: user.display_name, roles: Array.isArray(user.roles) ? user.roles.filter(Boolean) : (typeof user.roles === 'string' ? user.roles.replace(/[{}]/g, '').split(',').map(s => s.trim()).filter(Boolean) : []) }
       }
     });
   } catch (error) { next(error); }

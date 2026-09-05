@@ -9,6 +9,25 @@ export const quoteRouter = Router();
 
 quoteRouter.use(requireAuthentication);
 
+// Lookup endpoints for the new-quotation form
+import { pool } from '../../../infrastructure/database/pool.js';
+quoteRouter.get('/meta/customers', async (_req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT c.id, c.legal_name, ct.code AS tier_code, ct.entitlement_discount_percent FROM customers c JOIN customer_tiers ct ON ct.id = c.tier_id ORDER BY c.legal_name`
+    );
+    res.json({ data: rows });
+  } catch (err) { next(err); }
+});
+quoteRouter.get('/meta/products', async (_req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT p.id, p.name, p.sku, p.list_price, p.unit_name, c.code AS category_code, c.discount_ceiling_percent FROM products p JOIN product_categories c ON c.id = p.category_id WHERE p.is_active ORDER BY p.name`
+    );
+    res.json({ data: rows });
+  } catch (err) { next(err); }
+});
+
 quoteRouter.get('/', salesRepController.listQuotations);
 quoteRouter.post('/', requireRole('sales_rep', 'admin'), validate(createQuoteSchema), salesRepController.createQuotation);
 quoteRouter.get('/:quoteId', validate(idParams, 'params'), salesRepController.getQuotation);

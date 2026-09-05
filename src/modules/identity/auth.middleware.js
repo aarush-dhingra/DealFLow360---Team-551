@@ -17,7 +17,13 @@ export async function requireAuthentication(request, _response, next) {
       [tokenHash(match[1])]
     );
     if (!rows[0]) throw new AppError(401, 'UNAUTHENTICATED', 'Session is invalid or expired.');
-    request.principal = { ...rows[0], roles: rows[0].roles };
+    const rawRoles = rows[0].roles;
+    const roles = Array.isArray(rawRoles)
+      ? rawRoles.filter(Boolean)
+      : typeof rawRoles === 'string'
+        ? rawRoles.replace(/[{}]/g, '').split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+    request.principal = { ...rows[0], roles };
     next();
   } catch (error) { next(error); }
 }
