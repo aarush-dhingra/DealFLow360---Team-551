@@ -1,11 +1,13 @@
+import Decimal from 'decimal.js';
+
 export function determineRoute(blendedRiskPercent, policy) {
-  const risk = parseFloat(blendedRiskPercent);
+  const risk = new Decimal(blendedRiskPercent);
 
-  if (risk <= 0) return 'none';
+  if (risk.lte(0)) return 'none';
 
-  const managerMax = parseFloat(policy.manager_max_blended_risk_percent);
+  const managerMax = new Decimal(policy.manager_max_blended_risk_percent);
 
-  if (risk <= managerMax) return 'manager';
+  if (risk.lte(managerMax)) return 'manager';
 
   return policy.high_risk_route === 'finance_direct'
     ? 'finance_direct'

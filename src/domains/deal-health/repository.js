@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { pool } from '../../infrastructure/database/pool.js';
 
 // ─── Deal health policy ───────────────────────────────────────────────────────
@@ -41,17 +42,10 @@ export async function assessAndStore(quotationId, policy) {
     const ageDays = parseInt(quote_age_days, 10);
     const inactDays = parseInt(inactivity_days, 10);
 
-    const tp = parseFloat(policy.turn_points);
-    const tpc = parseFloat(policy.turn_points_cap);
-    const ap = parseFloat(policy.quote_age_day_points);
-    const apc = parseFloat(policy.quote_age_points_cap);
-    const ip = parseFloat(policy.inactivity_day_points);
-    const ipc = parseFloat(policy.inactivity_points_cap);
-
-    const score =
-      Math.min(tpc, turns * tp) +
-      Math.min(apc, ageDays * ap) +
-      Math.min(ipc, inactDays * ip);
+    const capped = (value, cap) => Decimal.min(new Decimal(value), new Decimal(cap));
+    const score = capped(new Decimal(turns).mul(policy.turn_points), policy.turn_points_cap)
+      .plus(capped(new Decimal(ageDays).mul(policy.quote_age_day_points), policy.quote_age_points_cap))
+      .plus(capped(new Decimal(inactDays).mul(policy.inactivity_day_points), policy.inactivity_points_cap));
 
     const { rows: assessmentRows } = await client.query(
       `INSERT INTO deal_health_assessments
@@ -63,14 +57,14 @@ export async function assessAndStore(quotationId, policy) {
         turns,
         ageDays,
         inactDays,
-        score,
+        score.toFixed(4),
         'normal',
         JSON.stringify(policy),
       ]
     );
 
     await client.query('COMMIT');
-    return { assessment: assessmentRows[0], turns, ageDays, inactDays, score };
+    return { assessment: assessmentRows[0], turns, ageDays, inactDays, score: score.toFixed(4) };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { pool } from '../../infrastructure/database/pool.js';
 
 export async function computeAndStoreRisk(quotationVersionId, route, policy) {
@@ -9,15 +10,15 @@ export async function computeAndStoreRisk(quotationVersionId, route, policy) {
       `SELECT
          ql.id AS quotation_line_id,
          ql.line_base_value,
-         COALESCE(ql.line_discount_percent, 0) AS requested_discount_percent,
+         CASE WHEN qv.discount_mode = 'order' THEN qv.order_discount_percent ELSE COALESCE(ql.line_discount_percent, 0) END AS requested_discount_percent,
          ql.allowed_discount_percent,
-         GREATEST(0, COALESCE(ql.line_discount_percent, 0) - ql.allowed_discount_percent)
+         GREATEST(0, (CASE WHEN qv.discount_mode = 'order' THEN qv.order_discount_percent ELSE COALESCE(ql.line_discount_percent, 0) END) - ql.allowed_discount_percent)
            AS line_overage_percent,
          ql.line_base_value
-           * GREATEST(0, COALESCE(ql.line_discount_percent, 0) - ql.allowed_discount_percent)
+           * GREATEST(0, (CASE WHEN qv.discount_mode = 'order' THEN qv.order_discount_percent ELSE COALESCE(ql.line_discount_percent, 0) END) - ql.allowed_discount_percent)
            / 100
            AS line_excess_value
-       FROM quotation_lines ql
+       FROM quotation_lines ql JOIN quotation_versions qv ON qv.id = ql.quotation_version_id
        WHERE ql.quotation_version_id = $1`,
       [quotationVersionId]
     );
@@ -29,7 +30,7 @@ export async function computeAndStoreRisk(quotationVersionId, route, policy) {
          SUM(ql.line_base_value) AS total_pre_discount_order_value,
          SUM(
            ql.line_base_value
-           * GREATEST(0, COALESCE(ql.line_discount_percent, 0) - ql.allowed_discount_percent)
+           * GREATEST(0, (CASE WHEN qv.discount_mode = 'order' THEN qv.order_discount_percent ELSE COALESCE(ql.line_discount_percent, 0) END) - ql.allowed_discount_percent)
            / 100
          ) AS total_line_excess_value,
          CASE
@@ -37,20 +38,20 @@ export async function computeAndStoreRisk(quotationVersionId, route, policy) {
            THEN (
              SUM(
                ql.line_base_value
-               * GREATEST(0, COALESCE(ql.line_discount_percent, 0) - ql.allowed_discount_percent)
+               * GREATEST(0, (CASE WHEN qv.discount_mode = 'order' THEN qv.order_discount_percent ELSE COALESCE(ql.line_discount_percent, 0) END) - ql.allowed_discount_percent)
                / 100
              ) / SUM(ql.line_base_value)
            ) * 100
            ELSE 0
          END AS blended_risk_percent
-       FROM quotation_lines ql
+       FROM quotation_lines ql JOIN quotation_versions qv ON qv.id = ql.quotation_version_id
        WHERE ql.quotation_version_id = $1`,
       [quotationVersionId]
     );
 
     const { total_pre_discount_order_value, total_line_excess_value, blended_risk_percent } = totals[0];
 
-    if (parseFloat(total_pre_discount_order_value) <= 0) {
+    if (new Decimal(total_pre_discount_order_value).lte(0)) {
       throw new Error('Pre-discount order value must be positive before risk can be assessed');
     }
 

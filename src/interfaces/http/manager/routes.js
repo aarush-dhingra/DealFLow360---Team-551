@@ -20,8 +20,8 @@ import { NotFoundError } from '../../../shared/http/errors.js';
 
 export const managerRouter = Router();
 
-const internal = ['admin', 'sales_manager', 'finance_operations', 'sales_rep'];
-const managers = ['admin', 'sales_manager'];
+const internal = ['admin', 'sales_manager', 'finance_operations'];
+const managers = ['admin'];
 const reviewers = ['admin', 'sales_manager', 'finance_operations'];
 
 // ─── Config: tiers ───────────────────────────────────────────────────────────

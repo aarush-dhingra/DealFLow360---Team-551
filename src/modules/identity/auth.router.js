@@ -4,24 +4,23 @@ import { z } from 'zod';
 import { env } from '../../infrastructure/config/env.js';
 import { pool } from '../../infrastructure/database/pool.js';
 import { AppError, validate } from '../../shared/http.js';
-import { verifyPassword } from './password.js';
 import { requireAuthentication } from './auth.middleware.js';
 
 export const authRouter = Router();
-const loginSchema = z.object({ email: z.string().email().max(320).transform((value) => value.toLowerCase()), password: z.string().min(8).max(256) });
+const loginSchema = z.object({ email: z.string().email().max(320).transform((value) => value.toLowerCase()) });
 const tokenHash = (token) => createHash('sha256').update(token).digest('hex');
 
 authRouter.post('/login', validate(loginSchema), async (request, response, next) => {
   try {
-    const { email, password } = request.validated.body;
+    const { email } = request.validated.body;
     const { rows } = await pool.query(
-      `SELECT u.id, u.email, u.display_name, u.password_hash, array_agg(ur.role) AS roles
+      `SELECT u.id, u.email, u.display_name, array_agg(ur.role) AS roles
        FROM users u JOIN user_roles ur ON ur.user_id = u.id
        WHERE u.email = $1 AND u.is_active = TRUE GROUP BY u.id`, [email]
     );
     const user = rows[0];
-    if (!user || !user.password_hash || !(await verifyPassword(password, user.password_hash))) {
-      throw new AppError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
+    if (!user) {
+      throw new AppError(401, 'INVALID_CREDENTIALS', 'No active user exists for this email.');
     }
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + env.SESSION_TTL_HOURS * 60 * 60 * 1000);

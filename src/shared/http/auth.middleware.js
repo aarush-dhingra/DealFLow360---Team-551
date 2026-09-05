@@ -1,17 +1,25 @@
-import jwt from 'jsonwebtoken';
+import { createHash } from 'node:crypto';
+import { pool } from '../../infrastructure/database/pool.js';
 
-export function requireAuth(req, res, next) {
+const tokenHash = (token) => createHash('sha256').update(token).digest('hex');
+
+export async function requireAuth(req, res, next) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing or invalid authorization header' });
   }
-  const token = header.slice(7);
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { id: payload.sub, roles: payload.roles ?? [] };
+    const { rows } = await pool.query(
+      `SELECT s.id AS session_id,u.id,u.email,u.display_name,array_agg(ur.role) AS roles
+       FROM auth_sessions s JOIN users u ON u.id=s.user_id JOIN user_roles ur ON ur.user_id=u.id
+       WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now() AND u.is_active
+       GROUP BY s.id,u.id`, [tokenHash(header.slice(7))]
+    );
+    if (!rows[0]) return res.status(401).json({ error: 'Invalid or expired session' });
+    req.user = rows[0];
     next();
-  } catch {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  } catch (error) {
+    next(error);
   }
 }
 

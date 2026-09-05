@@ -1,11 +1,13 @@
-export function computeBand(score, policy) {
-  const s = parseFloat(score);
-  const finance = parseFloat(policy.finance_threshold);
-  const manager = parseFloat(policy.manager_threshold);
-  const warning = parseFloat(policy.warning_threshold);
+import Decimal from 'decimal.js';
 
-  if (s >= finance) return 'finance';
-  if (s >= manager) return 'manager';
-  if (s >= warning) return 'warning';
+export function computeBand(score, policy) {
+  const s = new Decimal(score);
+  const finance = new Decimal(policy.finance_threshold);
+  const manager = new Decimal(policy.manager_threshold);
+  const warning = new Decimal(policy.warning_threshold);
+
+  if (s.gte(finance)) return 'finance';
+  if (s.gte(manager)) return 'manager';
+  if (s.gte(warning)) return 'warning';
   return 'normal';
 }

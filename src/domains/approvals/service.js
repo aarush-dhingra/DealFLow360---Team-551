@@ -1,4 +1,5 @@
 import { pool } from '../../infrastructure/database/pool.js';
+import Decimal from 'decimal.js';
 import { NotFoundError, ForbiddenError, ConflictError, AppError } from '../../shared/http/errors.js';
 import * as repo from './repository.js';
 
@@ -56,10 +57,10 @@ export async function approveQuotation(approvalId, actorUser, reason) {
         `SELECT blended_risk_percent FROM risk_assessments WHERE id = $1`,
         [approval.risk_assessment_id]
       );
-      const blendedRisk = riskRows.length ? parseFloat(riskRows[0].blended_risk_percent) : 0;
-      const managerMax = parseFloat(policy.manager_max_blended_risk_percent);
+      const blendedRisk = new Decimal(riskRows[0]?.blended_risk_percent ?? 0);
+      const managerMax = new Decimal(policy.manager_max_blended_risk_percent);
 
-      if (blendedRisk > managerMax) {
+      if (blendedRisk.gt(managerMax)) {
         await repo.createFinanceApprovalInstance(
           client,
           approval.quotation_id,
