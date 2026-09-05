@@ -112,12 +112,15 @@ export async function createQuoteRequest(req, res, next) {
     const contact = contacts[0];
     if (!contact) throw new NotFoundError('Customer contact');
 
-    const { rows } = await pool.query(
-      `INSERT INTO quote_requests (customer_id, contact_id, message) VALUES ($1, $2, $3)
-       RETURNING id, message, status, created_at`,
-      [contact.customer_id, contact.id, message]
-    );
-    created(res, { request: rows[0] });
+    const { inTransaction, writeAuditAndOutbox } = await import('../../../infrastructure/database/transaction.js');
+    const request = await inTransaction(async (client) => {
+      const { rows: reps } = await client.query(`SELECT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id AND ur.role='sales_rep' WHERE u.is_active ORDER BY (SELECT count(*) FROM quote_requests qr WHERE qr.assigned_sales_rep_id=u.id AND qr.status IN ('pending','viewed')) ASC,u.created_at ASC LIMIT 1`);
+      if (!reps[0]) throw new Error('No active sales representative is available.');
+      const { rows } = await client.query(`INSERT INTO quote_requests (customer_id,contact_id,message,assigned_sales_rep_id,assigned_at) VALUES ($1,$2,$3,$4,now()) RETURNING id,message,status,created_at,assigned_sales_rep_id`,[contact.customer_id,contact.id,message,reps[0].id]);
+      await writeAuditAndOutbox(client,{aggregateType:'quote_request',aggregateId:rows[0].id,eventType:'quote_request.assigned_to_sales_rep',actorUserId:null,afterState:rows[0],metadata:{customerId:contact.customer_id,assignedSalesRepId:reps[0].id}});
+      return rows[0];
+    });
+    created(res, { request });
   } catch (err) { next(err); }
 }
 

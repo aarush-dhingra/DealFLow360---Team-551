@@ -16,7 +16,7 @@ const flatNavItems = [
   { label: 'Fulfillment',   href: '/fulfillment',           roles: ['finance_operations'] },
   { label: 'Subscriptions', href: '/subscriptions',         roles: ['sales_manager'] },
   { label: 'Invoices',      href: '/invoices',              roles: ['finance_operations'] },
-  { label: 'Quote Requests', href: '/quote-requests',       roles: ['sales_manager'] },
+  { label: 'Quote Requests', href: '/quote-requests',       roles: ['sales_rep'] },
   { label: 'Deal Health',   href: '/deal-health',           roles: ['sales_manager'] },
   { label: 'Reports',       href: '/reports',               roles: ['sales_manager'] },
   { label: 'Products',      href: '/products',              roles: ['sales_manager'] },
@@ -33,7 +33,6 @@ const adminGroups = [
     items: [
       { label: 'Fulfillment',    href: '/fulfillment' },
       { label: 'Subscriptions',  href: '/subscriptions' },
-      { label: 'Quote Requests', href: '/quote-requests' },
       { label: 'Deal Health',    href: '/deal-health' },
       { label: 'Reports',        href: '/reports' },
     ],

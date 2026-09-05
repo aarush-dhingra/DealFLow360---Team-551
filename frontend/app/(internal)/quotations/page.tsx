@@ -22,6 +22,7 @@ const STATUS_DISPLAY: Record<string, string> = {
   draft: 'Draft',
   pending_manager_approval: 'Pending Approval',
   pending_finance_approval: 'Pending Finance',
+  escalated: 'Escalated',
   approved: 'Approved',
   returned_for_revision: 'Returned',
   rejected: 'Rejected',
@@ -41,7 +42,7 @@ const STATUS_VARIANT: Record<string, 'gray' | 'yellow' | 'green' | 'blue' | 'red
   negotiation: 'blue',
 };
 
-const KANBAN_COLS = ['draft', 'pending_manager_approval', 'pending_finance_approval', 'approved', 'negotiation', 'paid'];
+const KANBAN_COLS = ['draft', 'negotiation', 'escalated', 'approved', 'paid'];
 
 export default function QuotationsPage() {
   const router = useRouter();
@@ -143,7 +144,7 @@ function KanbanView({ quotes: initialQuotes, onOpen }: { quotes: QuoteRow[]; onO
   return (
     <div className="flex gap-4 overflow-x-auto pb-4">
       {KANBAN_COLS.map((status) => {
-        const cards = quotes.filter((q) => q.status === status);
+        const cards = quotes.filter((q) => status === 'escalated' ? ['pending_manager_approval', 'pending_finance_approval'].includes(q.status) : q.status === status);
         const isDropTarget = dragId !== null && ALLOWED_DRAGS[dragSourceStatus.current ?? ''] === status;
         return (
           <div

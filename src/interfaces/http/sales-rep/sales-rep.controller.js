@@ -209,6 +209,8 @@ export async function getTimeline(request, response, next) {
   } catch (error) { next(error); }
 }
 
+export async function listQuoteRequests(request,response,next){try{const {rows}=await pool.query(`SELECT qr.id,qr.message,qr.status,qr.created_at,cc.email AS contact_email,cc.display_name AS contact_name,c.legal_name AS customer_name FROM quote_requests qr JOIN customer_contacts cc ON cc.id=qr.contact_id JOIN customers c ON c.id=qr.customer_id WHERE qr.assigned_sales_rep_id=$1 ORDER BY qr.created_at DESC`,[request.principal.id]);response.json({requests:rows});}catch(error){next(error);}}
+
 export async function getNegotiationRequests(request, response, next) {
   try {
     const quote = await quoteForAccess(pool, request, request.validated.params.quoteId);

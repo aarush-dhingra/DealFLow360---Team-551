@@ -26,7 +26,7 @@ export default function QuoteRequestsPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get<{ requests: QuoteRequest[] }>('/manager/quote-requests')
+    api.get<{ requests: QuoteRequest[] }>('/sales-rep/quotations/requests')
       .then((r) => setRequests(r.requests))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -36,7 +36,7 @@ export default function QuoteRequestsPage() {
     <div className="max-w-5xl">
       <PageHeader
         title="Quote Requests"
-        subtitle="Customers who have requested a new quotation from the portal"
+        subtitle="Your assigned customer requests. Build and send the quotation before any manager or finance escalation."
       />
 
       {error && (
@@ -63,7 +63,7 @@ export default function QuoteRequestsPage() {
                   <p className="text-sm text-gray-700 line-clamp-2">{r.message}</p>
                 </Td>
                 <Td>
-                  <Badge variant={STATUS_VARIANT[r.status] ?? 'gray'} className="capitalize">
+                  <Badge variant={STATUS_VARIANT[r.status] ?? 'gray'}>
                     {r.status}
                   </Badge>
                 </Td>

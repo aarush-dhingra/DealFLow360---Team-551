@@ -53,6 +53,7 @@ quoteRouter.get('/meta/upsell-suggestions', async (req, res, next) => {
 });
 
 quoteRouter.get('/', salesRepController.listQuotations);
+quoteRouter.get('/requests', requireRole('sales_rep'), salesRepController.listQuoteRequests);
 quoteRouter.post('/', requireRole('sales_rep', 'admin'), validate(createQuoteSchema), salesRepController.createQuotation);
 quoteRouter.get('/:quoteId', validate(idParams, 'params'), salesRepController.getQuotation);
 quoteRouter.post('/:quoteId/revisions', requireRole('sales_rep', 'admin'), validate(idParams, 'params'), validate(revisionSchema), salesRepController.createRevision);
