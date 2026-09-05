@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { PageHeader, StatCard, Badge, Button, Card, Table, Tr, Td } from '@/components/ui';
+import { PageHeader, StatCard, Badge, Button, Card } from '@/components/ui';
 
 interface StalledDeal {
   quotation_id: string;
@@ -85,7 +85,7 @@ export default function DealHealthPage() {
       <PageHeader title="Deal Health and Anomaly Dashboard" subtitle="Real-time flags for stalled deals and unusual discount patterns" />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <StatCard label="Stalled Deals" value={stalled.length} sub={`Idle 7+ days`} />
+        <StatCard label="Stalled Deals" value={stalled.length} sub="Idle 7+ days" />
         <StatCard label="Discount Anomalies" value={anomalies.length} sub="Above rep average" />
         <StatCard label="Pending Approvals" value={pending.total} sub={`Manager: ${pending.sales_manager} / Finance: ${pending.finance_operations}`} />
       </div>
@@ -93,27 +93,43 @@ export default function DealHealthPage() {
       {stalled.length > 0 && (
         <>
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Stalled Deals</h2>
+          <p className="text-xs text-gray-400 mb-2">Click a row to open the quotation and review the deal.</p>
           <Card className="mb-5">
-            <Table headers={['Quote', 'Customer', 'Rep', 'Idle Days', 'Health Score', 'Action']}>
-              {stalled.map((deal) => (
-                <Tr key={deal.quotation_id}>
-                  <Td className="font-medium text-brand">{deal.quote_number}</Td>
-                  <Td>{deal.customer_name}</Td>
-                  <Td className="text-gray-500">{deal.rep_name}</Td>
-                  <Td><Badge variant="yellow">{deal.inactivity_days} days idle</Badge></Td>
-                  <Td className="text-gray-500">{deal.health_score ? `${parseFloat(deal.health_score).toFixed(1)} pts` : '—'}</Td>
-                  <Td>
-                    <Button
-                      variant="primary"
-                      onClick={() => nudge(deal.quotation_id)}
-                      disabled={nudging === deal.quotation_id}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {['Quote', 'Customer', 'Rep', 'Idle Days', 'Health Score', 'Action'].map((h) => (
+                      <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {stalled.map((deal) => (
+                    <tr
+                      key={deal.quotation_id}
+                      onClick={() => router.push(`/quotations/${deal.quotation_id}`)}
+                      className="cursor-pointer hover:bg-amber-50 transition-colors"
                     >
-                      {nudging === deal.quotation_id ? 'Nudging...' : 'Nudge Rep'}
-                    </Button>
-                  </Td>
-                </Tr>
-              ))}
-            </Table>
+                      <td className="px-4 py-3 font-medium text-brand">{deal.quote_number}</td>
+                      <td className="px-4 py-3 text-gray-900">{deal.customer_name}</td>
+                      <td className="px-4 py-3 text-gray-500">{deal.rep_name}</td>
+                      <td className="px-4 py-3"><Badge variant="yellow">{deal.inactivity_days} days idle</Badge></td>
+                      <td className="px-4 py-3 text-gray-500">{deal.health_score ? `${parseFloat(deal.health_score).toFixed(1)} pts` : '—'}</td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="primary"
+                          onClick={() => nudge(deal.quotation_id)}
+                          disabled={nudging === deal.quotation_id}
+                        >
+                          {nudging === deal.quotation_id ? 'Nudging...' : 'Nudge Rep'}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </Card>
         </>
       )}
@@ -121,30 +137,46 @@ export default function DealHealthPage() {
       {anomalies.length > 0 && (
         <>
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Discount Anomalies</h2>
+          <p className="text-xs text-gray-400 mb-2">Click a row to open the quotation and review the discount breakdown.</p>
           <Card className="mb-5">
-            <Table headers={['Quote', 'Customer', 'Rep', 'This Quote Discount', 'Rep Avg', 'Delta', 'Action']}>
-              {anomalies.map((a, i) => (
-                <Tr key={a.quotation_id ?? i}>
-                  <Td className="font-medium text-brand">{a.quote_number}</Td>
-                  <Td>{a.customer_name}</Td>
-                  <Td className="text-gray-500">{a.rep_name}</Td>
-                  <Td><Badge variant="red">{parseFloat(a.this_quote_discount_percent || '0').toFixed(1)}%</Badge></Td>
-                  <Td className="text-gray-500">{parseFloat(a.rep_avg_discount_percent || '0').toFixed(1)}%</Td>
-                  <Td><Badge variant="yellow">+{parseFloat(a.delta || '0').toFixed(1)} pts above avg</Badge></Td>
-                  <Td>
-                    <Button variant="warning" onClick={() => router.push('/approvals')}>
-                      Escalate
-                    </Button>
-                  </Td>
-                </Tr>
-              ))}
-            </Table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {['Quote', 'Customer', 'Rep', 'This Quote Discount', 'Rep Avg', 'Delta', 'Action'].map((h) => (
+                      <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {anomalies.map((a, i) => (
+                    <tr
+                      key={a.quotation_id ?? i}
+                      onClick={() => router.push(`/quotations/${a.quotation_id}`)}
+                      className="cursor-pointer hover:bg-red-50 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium text-brand">{a.quote_number}</td>
+                      <td className="px-4 py-3 text-gray-900">{a.customer_name}</td>
+                      <td className="px-4 py-3 text-gray-500">{a.rep_name}</td>
+                      <td className="px-4 py-3"><Badge variant="red">{parseFloat(a.this_quote_discount_percent || '0').toFixed(1)}%</Badge></td>
+                      <td className="px-4 py-3 text-gray-500">{parseFloat(a.rep_avg_discount_percent || '0').toFixed(1)}%</td>
+                      <td className="px-4 py-3"><Badge variant="yellow">+{parseFloat(a.delta || '0').toFixed(1)} pts above avg</Badge></td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="warning" onClick={(e) => { e.stopPropagation(); router.push('/approvals'); }}>
+                          Escalate
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </Card>
         </>
       )}
 
       {stalled.length === 0 && anomalies.length === 0 && (
-        <div className="text-center py-16 text-gray-400 text-sm">No active alerts - all deals are healthy.</div>
+        <div className="text-center py-16 text-gray-400 text-sm">No active alerts — all deals are healthy.</div>
       )}
     </div>
   );
