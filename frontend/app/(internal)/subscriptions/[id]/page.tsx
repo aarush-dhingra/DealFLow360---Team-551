@@ -1,26 +1,7 @@
-﻿'use client';
-
-import { useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/ui';
-
-export default function SubscriptionDetailPage() {
-  const router = useRouter();
-
-  return (
-    <div className="max-w-3xl">
-      <button onClick={() => router.back()} className="text-sm text-gray-400 hover:text-gray-600 mb-2">← Back</button>
-      <PageHeader title="Subscription Detail" subtitle="Billing and proration history" />
-      <div className="mt-16 flex flex-col items-center justify-center text-center">
-        <div className="w-14 h-14 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center mb-5">
-          <svg className="w-7 h-7 text-brand-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-          </svg>
-        </div>
-        <h2 className="text-base font-semibold text-gray-800 mb-2">Coming Soon</h2>
-        <p className="text-sm text-gray-500 max-w-xs leading-relaxed">
-          Subscription detail view is under active development and will be available in a future release.
-        </p>
-      </div>
-    </div>
-  );
-}
+'use client';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
+import { Card, PageHeader } from '@/components/ui';
+type Plan={name:string;code:string;interval_unit:string;is_active:boolean;subscription_count:number;proration_policy:Record<string,unknown>;cancellation_policy:Record<string,unknown>};
+export default function SubscriptionDetailPage(){const {id}=useParams<{id:string}>();const router=useRouter();const [plan,setPlan]=useState<Plan|null>(null);const [error,setError]=useState('');useEffect(()=>{api.get<{plan:Plan}>(`/manager/subscription-plans/${id}`).then(r=>setPlan(r.plan)).catch(e=>setError(e.message))},[id]);if(error)return <div className="p-8 text-red-600">{error}</div>;if(!plan)return <div className="p-8 text-gray-500">Loading plan…</div>;return <div className="max-w-3xl"><button onClick={()=>router.back()} className="text-sm text-gray-500 mb-3">← Back</button><PageHeader title={plan.name} subtitle={`${plan.code} · ${plan.interval_unit}`}/><Card className="mt-5 p-5 grid sm:grid-cols-3 gap-5 text-sm"><p><span className="text-gray-500">Status</span><br/>{plan.is_active?'Active':'Inactive'}</p><p><span className="text-gray-500">Active subscriptions</span><br/>{plan.subscription_count}</p><p><span className="text-gray-500">Billing interval</span><br/>{plan.interval_unit}</p><p className="sm:col-span-3"><span className="text-gray-500">Proration policy</span><br/>{Object.keys(plan.proration_policy??{}).length?JSON.stringify(plan.proration_policy):'Default policy'}</p><p className="sm:col-span-3"><span className="text-gray-500">Cancellation policy</span><br/>{Object.keys(plan.cancellation_policy??{}).length?JSON.stringify(plan.cancellation_policy):'Default policy'}</p></Card></div>}

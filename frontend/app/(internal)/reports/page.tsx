@@ -52,7 +52,6 @@ export default function ReportsPage() {
       .then((r) => setData(r.data))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
   const hoursNum = data ? parseFloat(String(data.averageApprovalHours)) : 0;

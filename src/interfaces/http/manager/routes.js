@@ -51,6 +51,8 @@ managerRouter.put('/config/approval-policy', requireAuth, requireRole(...manager
 // ─── Config: deal health policy ───────────────────────────────────────────────
 
 managerRouter.get('/config/deal-health-policy', requireAuth, requireRole(...reviewers), configController.getDealHealthPolicy);
+managerRouter.get('/subscription-plans', requireAuth, requireRole(...reviewers), configController.listSubscriptionPlans);
+managerRouter.get('/subscription-plans/:id', requireAuth, requireRole(...reviewers), configController.getSubscriptionPlan);
 
 // ─── Quotations ───────────────────────────────────────────────────────────────
 

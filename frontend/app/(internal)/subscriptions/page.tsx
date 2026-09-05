@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, getUser } from '@/lib/api';
 import { PageHeader, Badge, Card } from '@/components/ui';
 
@@ -22,6 +23,7 @@ const intervalLabel: Record<string, string> = {
 };
 
 export default function SubscriptionsPage() {
+  const router = useRouter();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,8 +32,8 @@ export default function SubscriptionsPage() {
   useEffect(() => {
     const roles = getUser()?.roles ?? [];
     setIsAdmin(roles.includes('admin'));
-    api.get<{ data: Plan[] }>('/admin/subscription-plans')
-      .then((r) => setPlans(Array.isArray(r.data) ? r.data : []))
+    api.get<{ plans: Plan[] }>('/manager/subscription-plans')
+      .then((r) => setPlans(Array.isArray(r.plans) ? r.plans : []))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load plans'))
       .finally(() => setLoading(false));
   }, []);
@@ -97,7 +99,7 @@ export default function SubscriptionsPage() {
                     ? JSON.stringify(plan.cancellation_policy)
                     : 'Default';
                   return (
-                    <tr key={plan.id} className="hover:bg-gray-50">
+                    <tr key={plan.id} onClick={() => router.push(`/subscriptions/${plan.id}`)} className="hover:bg-gray-50 cursor-pointer">
                       <td className="px-4 py-3 font-medium text-gray-900">{plan.name}</td>
                       <td className="px-4 py-3 text-xs font-mono text-gray-500">{plan.code}</td>
                       <td className="px-4 py-3">
@@ -130,7 +132,7 @@ export default function SubscriptionsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {inactive.map((plan) => (
-                    <tr key={plan.id} className="opacity-60">
+                    <tr key={plan.id} onClick={() => router.push(`/subscriptions/${plan.id}`)} className="opacity-60 cursor-pointer">
                       <td className="px-4 py-3 font-medium text-gray-700">{plan.name}</td>
                       <td className="px-4 py-3 text-xs font-mono text-gray-500">{plan.code}</td>
                       <td className="px-4 py-3">

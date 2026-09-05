@@ -27,6 +27,19 @@ quoteRouter.get('/meta/products', async (_req, res, next) => {
     res.json({ data: rows });
   } catch (err) { next(err); }
 });
+quoteRouter.get('/meta/products/:productId', async (req, res, next) => {
+  try {
+    const { rows: products } = await pool.query(`SELECT p.*,c.code AS category_code,c.display_name AS category_name FROM products p JOIN product_categories c ON c.id=p.category_id WHERE p.id=$1`, [req.params.productId]);
+    if (!products[0]) return res.status(404).json({ error: { message: 'Product not found.' } });
+    const product = products[0];
+    const [variants, prices, inventory] = await Promise.all([
+      pool.query('SELECT id,sku,attributes,extra_price,is_active FROM product_variants WHERE product_id=$1 ORDER BY sku',[product.id]),
+      pool.query(`SELECT pl.name,pl.currency_code,COALESCE(ct.display_name,'Base') AS tier_name,pli.unit_price FROM price_list_items pli JOIN price_lists pl ON pl.id=pli.price_list_id LEFT JOIN customer_tiers ct ON ct.id=pl.tier_id WHERE pli.product_id=$1 ORDER BY pl.name`,[product.id]),
+      pool.query(`SELECT COALESCE(sum(quantity_on_hand),0) AS on_hand,COALESCE(sum(quantity_reserved),0) AS reserved FROM inventory_levels WHERE product_id=$1`,[product.id])
+    ]);
+    res.json({ data: { ...product, variants: variants.rows, price_lists: prices.rows, inventory: inventory.rows[0] } });
+  } catch (err) { next(err); }
+});
 
 quoteRouter.get('/meta/upsell-suggestions', async (req, res, next) => {
   try {

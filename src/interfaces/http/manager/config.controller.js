@@ -67,3 +67,15 @@ export async function getDealHealthPolicy(_req, res, next) {
     res.json({ policy: await dealHealthRepo.getActiveDealHealthPolicy() });
   } catch (err) { next(err); }
 }
+
+export async function getSubscriptionPlan(req, res, next) {
+  try {
+    const { rows } = await (await import('../../../infrastructure/database/pool.js')).pool.query(`SELECT sp.*,count(s.id)::int AS subscription_count FROM subscription_plans sp LEFT JOIN subscriptions s ON s.plan_id=sp.id WHERE sp.id=$1 GROUP BY sp.id`, [req.params.id]);
+    if (!rows[0]) throw new NotFoundError('Subscription plan');
+    res.json({ plan: rows[0] });
+  } catch (err) { next(err); }
+}
+
+export async function listSubscriptionPlans(_req, res, next) {
+  try { const { rows } = await (await import('../../../infrastructure/database/pool.js')).pool.query('SELECT * FROM subscription_plans ORDER BY code'); res.json({ plans: rows }); } catch (err) { next(err); }
+}

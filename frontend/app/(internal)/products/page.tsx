@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 import { PageHeader, StatCard, Badge, Card } from '@/components/ui';
 
 interface Product {
@@ -14,6 +15,7 @@ interface Product {
 }
 
 export default function ProductsPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -57,7 +59,7 @@ export default function ProductsPage() {
                 <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
               )}
               {!loading && products.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50">
+                <tr key={p.id} onClick={() => router.push(`/products/${p.id}`)} className="hover:bg-gray-50 cursor-pointer">
                   <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{p.sku}</td>
                   <td className="px-4 py-3"><Badge variant="gray">{p.category_code}</Badge></td>
