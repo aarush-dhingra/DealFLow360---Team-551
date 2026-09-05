@@ -14,7 +14,8 @@ async function ensureUser({ email, displayName, role, passwordHash }) {
      ON CONFLICT (email) DO UPDATE
        SET password_hash = EXCLUDED.password_hash,
            display_name = EXCLUDED.display_name,
-           is_active = TRUE
+           is_active = TRUE,
+           must_change_password = FALSE
      RETURNING id`,
     [email, passwordHash, displayName]
   );
@@ -69,12 +70,17 @@ try {
       [legalName, tierId]
     );
   }
+  await client.query(`INSERT INTO customers (legal_name, tier_id, currency_code)
+    SELECT 'Gamma Startups', NULL, 'USD' WHERE NOT EXISTS (SELECT 1 FROM customers WHERE legal_name = 'Gamma Startups')`);
   const acmeId = await idFor('customers', 'legal_name', 'Acme Corp');
   await client.query(
     `INSERT INTO customer_contacts (customer_id, email, display_name)
      VALUES ($1, 'purchasing@acme.example', 'Alex Buyer') ON CONFLICT (customer_id, email) DO NOTHING`,
     [acmeId]
   );
+  const gammaId = await idFor('customers', 'legal_name', 'Gamma Startups');
+  await client.query(`INSERT INTO customer_contacts (customer_id, email, display_name)
+    VALUES ($1, 'buyer@gamma.example', 'Gina Buyer') ON CONFLICT (customer_id, email) DO NOTHING`, [gammaId]);
 
   const hardwareId = await idFor('product_categories', 'code', 'hardware');
   const softwareId = await idFor('product_categories', 'code', 'software');
