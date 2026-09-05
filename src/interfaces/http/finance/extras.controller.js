@@ -5,6 +5,7 @@
 import { reconcileInvoiceById } from '../../../domains/finance/reconciliation/service.js';
 import { listFinanceQueue, actOnAssessment } from '../../../domains/finance/deal-health/service.js';
 import { revenueReport, outstandingReport } from '../../../domains/finance/reporting/service.js';
+import { toCsv } from '../../../domains/finance/reporting/rules.js';
 import { asyncHandler } from './middleware.js';
 import {
   parse,
@@ -44,11 +45,55 @@ export const healthActionController = asyncHandler(async (req, res) => {
 export const revenueReportController = asyncHandler(async (req, res) => {
   const query = parse(revenueReportQuery, req.query);
   const report = await revenueReport(query);
+
+  if (query.format === 'csv') {
+    const csv = toCsv(
+      [
+        { key: 'invoiceDate', label: 'Invoice date' },
+        { key: 'invoiceCount', label: 'Invoices' },
+        { key: 'amountDue', label: 'Amount due' },
+        { key: 'amountPaid', label: 'Amount paid' }
+      ],
+      report.rows,
+      [
+        { key: 'invoiceDate', label: 'Invoice date' },
+        { key: 'invoiceCount', label: 'Invoices' },
+        { key: 'amountDue', label: 'Amount due' },
+        { key: 'amountPaid', label: 'Amount paid' }
+      ]
+    );
+    return res
+      .status(200)
+      .set('Content-Type', 'text/csv')
+      .set('Content-Disposition', 'attachment; filename="revenue.csv"')
+      .send(csv);
+  }
+
   res.status(200).json(report);
 });
 
 export const outstandingReportController = asyncHandler(async (req, res) => {
   const query = parse(outstandingReportQuery, req.query);
   const report = await outstandingReport(query);
+
+  if (query.format === 'csv') {
+    const columns = [
+      { key: 'invoiceNumber', label: 'Invoice' },
+      { key: 'customerName', label: 'Customer' },
+      { key: 'invoiceDate', label: 'Invoice date' },
+      { key: 'status', label: 'Status' },
+      { key: 'amountDue', label: 'Amount due' },
+      { key: 'amountPaid', label: 'Amount paid' },
+      { key: 'outstanding', label: 'Outstanding' },
+      { key: 'ageDays', label: 'Age days' }
+    ];
+    const csv = toCsv(columns, report.rows, columns);
+    return res
+      .status(200)
+      .set('Content-Type', 'text/csv')
+      .set('Content-Disposition', 'attachment; filename="outstanding.csv"')
+      .send(csv);
+  }
+
   res.status(200).json(report);
 });
