@@ -26,8 +26,17 @@ export default function InvoicesPage() {
   const [filter, setFilter] = useState<Filter>('all');
 
   useEffect(() => {
-    api.get<{ data: Invoice[] }>('/manager/invoices?limit=100')
-      .then((res) => setInvoices(res.data ?? []))
+    api.get<unknown>('/manager/invoices?limit=100')
+      .then((res: unknown) => {
+        const r = res as Record<string, unknown>;
+        const data = r.data as Record<string, unknown> | Invoice[] | undefined;
+        const list: Invoice[] = Array.isArray(res) ? res as Invoice[]
+          : Array.isArray(data) ? data
+          : Array.isArray((data as Record<string, unknown>)?.invoices) ? (data as Record<string, unknown>).invoices as Invoice[]
+          : Array.isArray(r.invoices) ? r.invoices as Invoice[]
+          : [];
+        setInvoices(list);
+      })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
   }, []);

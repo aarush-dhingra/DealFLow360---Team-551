@@ -7,11 +7,21 @@ import { PageHeader, InfoBanner, Button, Card, Table, Tr, Td } from '@/component
 interface Tier { code: string; display_name: string; entitlement_discount_percent: string }
 interface Category { code: string; display_name: string; discount_ceiling_percent: string }
 interface Policy { manager_max_blended_risk_percent: string; high_risk_route: string }
+interface DealHealthPolicy {
+  warning_threshold: string;
+  manager_threshold: string;
+  finance_threshold: string;
+  inactivity_day_points: string;
+  quote_age_day_points: string;
+  turn_points: string;
+  policy_version: number;
+}
 
 export default function DiscountTiersPage() {
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [policy, setPolicy] = useState<Policy | null>(null);
+  const [dealHealthPolicy, setDealHealthPolicy] = useState<DealHealthPolicy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -24,11 +34,13 @@ export default function DiscountTiersPage() {
       api.get<{ tiers: Tier[] }>('/manager/config/tiers'),
       api.get<{ categories: Category[] }>('/manager/config/categories'),
       api.get<{ policy: Policy }>('/manager/config/approval-policy'),
+      api.get<{ policy: DealHealthPolicy }>('/manager/config/deal-health-policy').catch(() => ({ policy: null })),
     ])
-      .then(([t, c, p]) => {
+      .then(([t, c, p, dh]) => {
         setTiers(t.tiers);
         setCategories(c.categories);
         setPolicy(p.policy);
+        setDealHealthPolicy(dh.policy);
         setPolicyForm({
           manager_max_blended_risk_percent: p.policy.manager_max_blended_risk_percent,
           high_risk_route: p.policy.high_risk_route,
@@ -137,6 +149,40 @@ export default function DiscountTiersPage() {
               {saving ? 'Saving...' : saved ? 'Saved' : 'Save Configuration'}
             </Button>
           </div>
+
+          {dealHealthPolicy && (
+            <>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-8 mb-3">Deal Health Policy <span className="normal-case font-normal text-gray-400">v{dealHealthPolicy.policy_version} - read only</span></h2>
+              <Card className="p-5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Warning threshold</p>
+                    <p className="font-medium text-gray-800">{dealHealthPolicy.warning_threshold} pts</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Manager threshold</p>
+                    <p className="font-medium text-gray-800">{dealHealthPolicy.manager_threshold} pts</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Finance threshold</p>
+                    <p className="font-medium text-gray-800">{dealHealthPolicy.finance_threshold} pts</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Points per inactivity day</p>
+                    <p className="font-medium text-gray-800">{dealHealthPolicy.inactivity_day_points}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Points per quote age day</p>
+                    <p className="font-medium text-gray-800">{dealHealthPolicy.quote_age_day_points}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Points per negotiation turn</p>
+                    <p className="font-medium text-gray-800">{dealHealthPolicy.turn_points}</p>
+                  </div>
+                </div>
+              </Card>
+            </>
+          )}
         </>
       )}
     </div>

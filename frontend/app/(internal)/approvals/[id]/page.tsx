@@ -55,12 +55,14 @@ export default function ApprovalDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  async function doAction(action: 'approve' | 'reject' | 'return') {
-    if ((action !== 'approve') && !reason.trim()) return;
+  async function doAction(action: 'approve' | 'reject' | 'return' | 'escalate') {
+    if (action !== 'approve' && !reason.trim()) return;
     setActing(true);
     try {
-      await api.post(`/manager/approvals/${id}/${action === 'return' ? 'return' : action}`, { reason: reason.trim() || 'Approved' });
-      setActionResult(action === 'approve' ? 'Approved successfully.' : action === 'reject' ? 'Rejected.' : 'Returned for revision.');
+      const endpoint = action === 'return' ? 'return' : action;
+      await api.post(`/manager/approvals/${id}/${endpoint}`, { reason: reason.trim() || 'Approved' });
+      const msg = { approve: 'Approved successfully.', reject: 'Rejected.', return: 'Returned for revision.', escalate: 'Escalated to Finance.' }[action];
+      setActionResult(msg);
       setTimeout(() => router.push('/approvals'), 1500);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Action failed');
@@ -182,10 +184,13 @@ export default function ApprovalDetailPage() {
 
           {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             <Button variant="primary" onClick={() => doAction('approve')} disabled={acting}>Approve</Button>
             <Button variant="warning" onClick={() => doAction('return')} disabled={acting || !reason.trim()}>Return for Revision</Button>
             <Button variant="danger"  onClick={() => doAction('reject')} disabled={acting || !reason.trim()}>Reject</Button>
+            {detail.required_role === 'sales_manager' && (
+              <Button variant="secondary" onClick={() => doAction('escalate')} disabled={acting || !reason.trim()}>Escalate to Finance</Button>
+            )}
           </div>
         </>
       ) : (

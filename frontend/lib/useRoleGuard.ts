@@ -10,7 +10,10 @@ export function useRoleGuard(allowedRoles: string[]) {
   useEffect(() => {
     const user = getUser();
     if (!user) return;
-    const hasRole = user.roles.some((r) => allowedRoles.includes(r));
+    const raw = (user as Record<string, unknown>).roles ?? (user as Record<string, unknown>).role;
+    if (!raw) return; // no roles stored yet — don't redirect
+    const roles: string[] = Array.isArray(raw) ? raw as string[] : [String(raw)];
+    const hasRole = roles.some((r) => allowedRoles.includes(r));
     if (!hasRole) router.replace('/dashboard');
   }, [router, allowedRoles.join(',')]);
 }

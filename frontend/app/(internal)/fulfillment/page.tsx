@@ -25,8 +25,17 @@ export default function FulfillmentPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.get<{ orders?: FulfillmentOrder[]; data?: FulfillmentOrder[] }>('/manager/fulfillment/orders')
-      .then((res) => setOrders(res.orders ?? res.data ?? []))
+    api.get<{ data?: { orders?: FulfillmentOrder[] } | FulfillmentOrder[]; orders?: FulfillmentOrder[] } | FulfillmentOrder[]>('/manager/fulfillment/orders')
+      .then((res: unknown) => {
+        const r = res as Record<string, unknown>;
+        const data = r.data as Record<string, unknown> | FulfillmentOrder[] | undefined;
+        const list: FulfillmentOrder[] = Array.isArray(res) ? res as FulfillmentOrder[]
+          : Array.isArray(data) ? data
+          : Array.isArray((data as Record<string, unknown>)?.orders) ? (data as Record<string, unknown>).orders as FulfillmentOrder[]
+          : Array.isArray(r.orders) ? r.orders as FulfillmentOrder[]
+          : [];
+        setOrders(list);
+      })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
   }, []);

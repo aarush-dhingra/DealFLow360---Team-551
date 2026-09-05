@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, getUser } from '@/lib/api';
 import { PageHeader, StatCard, Card } from '@/components/ui';
 
 export default function DashboardPage() {
@@ -10,6 +10,16 @@ export default function DashboardPage() {
   const [openQuotations, setOpenQuotations] = useState<number | null>(null);
   const [atRisk, setAtRisk] = useState<number | null>(null);
   const [activity, setActivity] = useState<string[]>([]);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    const u = getUser();
+    const raw = (u as Record<string, unknown> | null)?.roles;
+    const roles = Array.isArray(raw) ? raw as string[] : typeof raw === 'string' ? [raw] : [];
+    setUserRoles(roles);
+  }, []);
+
+  const isManager = userRoles.includes('sales_manager') || userRoles.includes('admin');
 
   useEffect(() => {
     api.get<{ approvals: unknown[]; count: number }>('/manager/approvals?status=pending')
@@ -37,15 +47,19 @@ export default function DashboardPage() {
       <PageHeader title="Sales Dashboard" subtitle="Central hub — links out to every module below" />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <Link href="/approvals">
-          <StatCard label="Pending Approvals" value={pendingApprovals ?? '…'} sub="quotations waiting for review" />
-        </Link>
+        {isManager && (
+          <Link href="/approvals">
+            <StatCard label="Pending Approvals" value={pendingApprovals ?? '…'} sub="quotations waiting for review" />
+          </Link>
+        )}
         <Link href="/quotations">
           <StatCard label="Open Quotations" value={openQuotations ?? '…'} sub="active deals in pipeline" />
         </Link>
-        <Link href="/deal-health">
-          <StatCard label="At-Risk Deals" value={atRisk ?? '…'} sub="stalled or anomalous discounts" />
-        </Link>
+        {isManager && (
+          <Link href="/deal-health">
+            <StatCard label="At-Risk Deals" value={atRisk ?? '…'} sub="stalled or anomalous discounts" />
+          </Link>
+        )}
       </div>
 
       <div className="flex gap-3 mb-6">
@@ -55,12 +69,14 @@ export default function DashboardPage() {
         >
           + New Quotation
         </Link>
-        <Link
-          href="/approvals"
-          className="px-4 py-2 bg-white text-gray-700 border border-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          View Approvals
-        </Link>
+        {isManager && (
+          <Link
+            href="/approvals"
+            className="px-4 py-2 bg-white text-gray-700 border border-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            View Approvals
+          </Link>
+        )}
       </div>
 
       <Card className="p-5">

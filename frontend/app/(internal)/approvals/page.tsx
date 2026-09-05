@@ -32,6 +32,7 @@ function stageLabel(row: ApprovalRow) {
 }
 
 export default function ApprovalsPage() {
+  useRoleGuard(['sales_manager', 'admin']);
   const router = useRouter();
   const [approvals, setApprovals] = useState<ApprovalRow[]>([]);
   const [loading, setLoading] = useState(true);
