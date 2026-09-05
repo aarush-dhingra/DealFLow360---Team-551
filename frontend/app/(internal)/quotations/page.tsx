@@ -68,12 +68,9 @@ export default function QuotationsPage() {
     api.get<{ data?: QuoteRow[]; quotations?: QuoteRow[] }>(endpoint)
       .then((res) => {
         const list = res.data ?? res.quotations ?? [];
-        if (isManager) {
-          // managers don't see finance_direct quotes (those go straight to finance, bypassing manager)
-          setQuotes(list.filter((q) => q.route !== 'finance_direct'));
-        } else if (isFinance) {
-          // finance sees only quotes that involve them (finance_direct or manager_then_finance routes)
-          setQuotes(list.filter((q) => q.route === 'finance_direct' || q.route === 'manager_then_finance'));
+        if (isFinance) {
+          // finance only sees quotes awaiting their sign-off (route not in list response)
+          setQuotes(list.filter((q) => q.status === 'pending_finance_approval'));
         } else {
           setQuotes(list);
         }
