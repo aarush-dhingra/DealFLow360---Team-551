@@ -1,0 +1,24 @@
+{
+  "name": "dealflow360-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend API for DealFlow360 sales operations platform",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test",
+    "db:migrate": "node src/infrastructure/database/migrate.js",
+    "db:seed": "node src/infrastructure/database/seed.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "pg": "^8.13.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {}
+}
