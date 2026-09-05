@@ -5,19 +5,23 @@ import { api } from '@/lib/api';
 import { PageHeader, StatCard, Badge, Button, Card, Table, Tr, Td } from '@/components/ui';
 
 interface StalledDeal {
-  id: string;
+  quotation_id: string;
   quote_number: string;
   customer_name: string;
+  rep_name: string;
   inactivity_days: number;
-  score: number | null;
+  health_score: string | null;
+  band: string | null;
 }
 
 interface DiscountAnomaly {
-  id: string;
+  quotation_id: string;
   quote_number: string;
   customer_name: string;
-  blended_risk_percent: string;
-  route: string;
+  rep_name: string;
+  this_quote_discount_percent: string;
+  rep_avg_discount_percent: string;
+  delta: string;
 }
 
 interface DashboardData {
@@ -88,19 +92,21 @@ export default function DealHealthPage() {
         <>
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Stalled Deals</h2>
           <Card className="mb-5">
-            <Table headers={['Quote', 'Customer', 'Idle Days', 'Action']}>
+            <Table headers={['Quote', 'Customer', 'Rep', 'Idle Days', 'Health Score', 'Action']}>
               {stalled.map((deal) => (
-                <Tr key={deal.id}>
+                <Tr key={deal.quotation_id}>
                   <Td className="font-medium text-brand">{deal.quote_number}</Td>
                   <Td>{deal.customer_name}</Td>
+                  <Td className="text-gray-500">{deal.rep_name}</Td>
                   <Td><Badge variant="yellow">{deal.inactivity_days} days idle</Badge></Td>
+                  <Td className="text-gray-500">{deal.health_score ? `${parseFloat(deal.health_score).toFixed(1)} pts` : '—'}</Td>
                   <Td>
                     <Button
                       variant="primary"
-                      onClick={() => nudge(deal.id)}
-                      disabled={nudging === deal.id}
+                      onClick={() => nudge(deal.quotation_id)}
+                      disabled={nudging === deal.quotation_id}
                     >
-                      {nudging === deal.id ? 'Nudging...' : 'Nudge Rep'}
+                      {nudging === deal.quotation_id ? 'Nudging...' : 'Nudge Rep'}
                     </Button>
                   </Td>
                 </Tr>
@@ -114,13 +120,15 @@ export default function DealHealthPage() {
         <>
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Discount Anomalies</h2>
           <Card className="mb-5">
-            <Table headers={['Quote', 'Customer', 'Blended Risk %', 'Route']}>
+            <Table headers={['Quote', 'Customer', 'Rep', 'This Quote Discount', 'Rep Avg', 'Delta']}>
               {anomalies.map((a, i) => (
-                <Tr key={a.quote_number ?? i}>
+                <Tr key={a.quotation_id ?? i}>
                   <Td className="font-medium text-brand">{a.quote_number}</Td>
                   <Td>{a.customer_name}</Td>
-                  <Td><Badge variant="red">{(parseFloat(a.blended_risk_percent) || 0).toFixed(1)}%</Badge></Td>
-                  <Td className="text-gray-600">{a.route ?? '—'}</Td>
+                  <Td className="text-gray-500">{a.rep_name}</Td>
+                  <Td><Badge variant="red">{parseFloat(a.this_quote_discount_percent || '0').toFixed(1)}%</Badge></Td>
+                  <Td className="text-gray-500">{parseFloat(a.rep_avg_discount_percent || '0').toFixed(1)}%</Td>
+                  <Td><Badge variant="yellow">+{parseFloat(a.delta || '0').toFixed(1)} pts above avg</Badge></Td>
                 </Tr>
               ))}
             </Table>
