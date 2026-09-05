@@ -77,6 +77,38 @@ adminController.post('/users/:id/reset-password', validate(idParams, 'params'), 
     respond(response, result);
   } catch (error) { next(error); }
 });
+adminController.delete('/users/:id', validate(idParams, 'params'), async (request, response, next) => {
+  try {
+    if (id(request) === actor(request)) throw new AppError(409, 'SELF_DELETE_FORBIDDEN', 'You cannot delete your own account.');
+    const result = await inTransaction(async (client) => {
+      const target = await getRequired(client, 'users', id(request));
+      const roles = (await client.query('SELECT role FROM user_roles WHERE user_id=$1', [target.id])).rows.map((row) => row.role);
+      if (roles.includes('customer_portal')) throw new AppError(409, 'CUSTOMER_ACCOUNT_DELETE_FORBIDDEN', 'Customer portal accounts are not removed from internal user management.');
+      const pending = await client.query(`SELECT id FROM quote_requests WHERE assigned_sales_rep_id=$1 AND status IN ('pending','viewed') FOR UPDATE`, [target.id]);
+      if (pending.rows.length) {
+        const replacement = await client.query(`SELECT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id AND ur.role='sales_rep' WHERE u.is_active AND u.id<>$1 ORDER BY (SELECT count(*) FROM quote_requests qr WHERE qr.assigned_sales_rep_id=u.id AND qr.status IN ('pending','viewed')),u.created_at LIMIT 1`, [target.id]);
+        if (!replacement.rows[0]) throw new AppError(409, 'NO_REPLACEMENT_REP', 'Assign another active sales representative before deleting this user.');
+        await client.query(`UPDATE quote_requests SET assigned_sales_rep_id=$1,assigned_at=now() WHERE assigned_sales_rep_id=$2 AND status IN ('pending','viewed')`, [replacement.rows[0].id,target.id]);
+      }
+      await client.query(`UPDATE quotations SET owner_display_name=COALESCE(owner_display_name,$1),owner_user_id=NULL,closed_by_user_id=NULL WHERE owner_user_id=$2 OR closed_by_user_id=$2`, [target.display_name,target.id]);
+      await client.query(`UPDATE approval_actions SET actor_display_name=COALESCE(actor_display_name,$1),actor_user_id=NULL WHERE actor_user_id=$2`, [target.display_name,target.id]);
+      await client.query(`UPDATE credit_notes SET created_by_display_name=COALESCE(created_by_display_name,$1),created_by_user_id=NULL WHERE created_by_user_id=$2`, [target.display_name,target.id]);
+      await client.query(`UPDATE audit_events SET actor_user_id=NULL WHERE actor_user_id=$1`, [target.id]);
+      await client.query(`UPDATE negotiation_case_events SET actor_user_id=NULL WHERE actor_user_id=$1`, [target.id]);
+      await client.query(`UPDATE quotation_versions SET created_by_user_id=NULL WHERE created_by_user_id=$1`, [target.id]);
+      await client.query(`UPDATE negotiation_messages SET internal_user_id=NULL WHERE internal_user_id=$1`, [target.id]);
+      await client.query(`UPDATE approval_instances SET assigned_user_id=NULL,decision_by_user_id=NULL WHERE assigned_user_id=$1 OR decision_by_user_id=$1`, [target.id]);
+      await client.query(`UPDATE inventory_adjustments SET adjusted_by_user_id=NULL WHERE adjusted_by_user_id=$1`, [target.id]);
+      await client.query(`UPDATE admin_configuration_revisions SET changed_by_user_id=NULL WHERE changed_by_user_id=$1`, [target.id]);
+      await client.query('DELETE FROM auth_sessions WHERE user_id=$1', [target.id]);
+      await client.query('DELETE FROM user_roles WHERE user_id=$1', [target.id]);
+      await client.query('DELETE FROM users WHERE id=$1', [target.id]);
+      await writeAuditAndOutbox(client,{aggregateType:'user',aggregateId:target.id,eventType:'internal_user.deleted',actorUserId:actor(request),metadata:{deletedEmail:target.email,deletedDisplayName:target.display_name,reassignedQuoteRequests:pending.rows.length}});
+      return { id:target.id, reassignedQuoteRequests:pending.rows.length };
+    });
+    respond(response,result);
+  } catch (error) { next(error); }
+});
 
 // Customers are master data: changing a customer tier is audited, and quote revisions use a policy snapshot.
 adminController.get('/customers', async (_request,response,next)=>{try{const {rows}=await pool.query(`SELECT c.*,ct.code AS tier_code,ct.display_name AS tier_name,count(cc.id)::int AS contact_count FROM customers c LEFT JOIN customer_tiers ct ON ct.id=c.tier_id LEFT JOIN customer_contacts cc ON cc.customer_id=c.id GROUP BY c.id,ct.code,ct.display_name ORDER BY c.legal_name`);respond(response,rows);}catch(error){next(error);}});
