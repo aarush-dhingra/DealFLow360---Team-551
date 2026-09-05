@@ -193,7 +193,7 @@ export default function NewQuotationPage() {
           {saving ? 'Saving…' : 'Save Draft'}
         </Button>
         <Button variant="primary" onClick={() => save(true)} disabled={saving}>
-          {saving ? 'Saving…' : needsApproval ? 'Submit for Approval' : 'Confirm Order'}
+          {saving ? 'Saving…' : 'Update'}
         </Button>
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, getUser } from '@/lib/api';
 import { routeToRisk, type BackendApprovalRoute } from '@/lib/data';
 import { PageHeader, RiskBadge, Badge, InfoBanner, Button, Card, PipelineStep, Table, Tr, Td } from '@/components/ui';
 
@@ -74,6 +74,11 @@ export default function ApprovalDetailPage() {
   if (loading) return <div className="p-8 text-gray-400 text-sm">Loading...</div>;
   if (error && !detail) return <div className="p-8 text-red-500 text-sm">Error: {error}</div>;
   if (!detail) return <div className="p-8 text-gray-500">Approval not found.</div>;
+
+  const userRoles = getUser()?.roles ?? [];
+  const isAdmin = userRoles.includes('admin');
+  const isPureSalesManager = userRoles.includes('sales_manager') && !isAdmin;
+  const cannotAct = isPureSalesManager && detail.required_role === 'finance_operations';
 
   const risk = detail.risk ? routeToRisk(detail.risk.route) : 'LOW';
   const blendedPct = detail.risk ? parseFloat(detail.risk.blended_risk_percent).toFixed(1) : '0';
@@ -181,31 +186,46 @@ export default function ApprovalDetailPage() {
           </button>
         </div>
       ) : detail.status === 'pending' ? (
-        <>
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Reason / Note <span className="text-gray-400">(required for Return or Reject)</span>
-            </label>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Add a reason, justification, or note for the record..."
-              rows={3}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand resize-none"
-            />
+        cannotAct ? (
+          <div className="px-4 py-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-center justify-between gap-3">
+            <div>
+              <span className="font-medium">Finance Operations approval required</span>
+              <p className="mt-0.5 text-blue-600">This item is assigned to Finance — Sales Managers cannot act on it. It will be handled by the Finance team.</p>
+            </div>
+            <button
+              onClick={() => router.push(`/quotations/${detail.quotation_id}`)}
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-blue-300 text-xs font-medium text-blue-900 hover:bg-blue-100 transition-colors"
+            >
+              View Quotation →
+            </button>
           </div>
+        ) : (
+          <>
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Reason / Note <span className="text-gray-400">(required for Return or Reject)</span>
+              </label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Add a reason, justification, or note for the record..."
+                rows={3}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand resize-none"
+              />
+            </div>
 
-          {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+            {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
-          <div className="flex gap-3 flex-wrap">
-            <Button variant="primary" onClick={() => doAction('approve')} disabled={acting}>Approve</Button>
-            <Button variant="warning" onClick={() => doAction('return')} disabled={acting || !reason.trim()}>Return for Revision</Button>
-            <Button variant="danger"  onClick={() => doAction('reject')} disabled={acting || !reason.trim()}>Reject</Button>
-            {detail.required_role === 'sales_manager' && (
-              <Button variant="secondary" onClick={() => doAction('escalate')} disabled={acting || !reason.trim()}>Escalate to Finance</Button>
-            )}
-          </div>
-        </>
+            <div className="flex gap-3 flex-wrap">
+              <Button variant="primary" onClick={() => doAction('approve')} disabled={acting}>Approve</Button>
+              <Button variant="warning" onClick={() => doAction('return')} disabled={acting || !reason.trim()}>Return for Revision</Button>
+              <Button variant="danger"  onClick={() => doAction('reject')} disabled={acting || !reason.trim()}>Reject</Button>
+              {detail.required_role === 'sales_manager' && (
+                <Button variant="secondary" onClick={() => doAction('escalate')} disabled={acting || !reason.trim()}>Escalate to Finance</Button>
+              )}
+            </div>
+          </>
+        )
       ) : (
         <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
           <span className="font-medium capitalize">{detail.status.replace(/_/g, ' ')}</span>

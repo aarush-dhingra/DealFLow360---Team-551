@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, getUser } from '@/lib/api';
 import { useRoleGuard } from '@/lib/useRoleGuard';
 import { routeToRisk, type BackendApprovalRoute } from '@/lib/data';
 import { PageHeader, RiskBadge, Badge, Card } from '@/components/ui';
@@ -39,12 +39,18 @@ export default function ApprovalsPage() {
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
 
+  const isAdmin = getUser()?.roles?.includes('admin') ?? false;
+
   useEffect(() => {
     api.get<{ approvals: ApprovalRow[]; count: number }>('/manager/approvals')
-      .then((res) => setApprovals(res.approvals))
+      .then((res) => {
+        const all = res.approvals;
+        // Non-admin managers can only act on sales_manager items; admins see everything
+        setApprovals(isAdmin ? all : all.filter((a) => a.required_role === 'sales_manager'));
+      })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [isAdmin]);
 
   const pending  = approvals.filter((a) => a.status === 'pending');
   const returned = approvals.filter((a) => a.status === 'returned_for_revision');
