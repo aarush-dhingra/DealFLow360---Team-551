@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../../../shared/http/auth.middleware.js';
+import { requireAuthentication, requireRole as requireCurrentRole } from '../../../modules/identity/auth.middleware.js';
+import { validate as validateCurrent } from '../../../shared/http.js';
 import { validate } from '../../../shared/http/validate.js';
 import {
   approvalActionSchema,
@@ -17,12 +19,23 @@ import * as catalogueRepo from '../../../domains/catalogue/repository.js';
 import * as approvalsRepo from '../../../domains/approvals/repository.js';
 import * as dealHealthRepo from '../../../domains/deal-health/repository.js';
 import { NotFoundError } from '../../../shared/http/errors.js';
+import { getFulfillmentOrder, previewFulfillment } from '../../../domains/fulfillment/service.js';
+import { fulfillmentOrderIdParams, quoteIdParams } from '../fulfillment.schemas.js';
 
 export const managerRouter = Router();
 
 const internal = ['admin', 'sales_manager', 'finance_operations'];
 const managers = ['admin'];
 const reviewers = ['admin', 'sales_manager', 'finance_operations'];
+
+// Managers monitor the warehouse plan and result but cannot alter allocations;
+// accepting or manually overriding a split is reserved for Finance/Operations.
+managerRouter.get('/fulfillment/quotes/:quoteId/suggestion', requireAuthentication, requireCurrentRole('sales_manager', 'finance_operations', 'admin'), validateCurrent(quoteIdParams, 'params'), async (req, res, next) => {
+  try { res.json({ data: await previewFulfillment(req.validated.params.quoteId) }); } catch (err) { next(err); }
+});
+managerRouter.get('/fulfillment/orders/:fulfillmentOrderId', requireAuthentication, requireCurrentRole('sales_manager', 'finance_operations', 'admin'), validateCurrent(fulfillmentOrderIdParams, 'params'), async (req, res, next) => {
+  try { res.json({ data: await getFulfillmentOrder(req.validated.params.fulfillmentOrderId) }); } catch (err) { next(err); }
+});
 
 // ─── Config: tiers ───────────────────────────────────────────────────────────
 
