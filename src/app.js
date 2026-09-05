@@ -1,7 +1,6 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { apiRouter } from './routes.js';
-<<<<<<< HEAD
 import { errorHandler, notFoundHandler } from './shared/http.js';
 
 export function createApp() {
