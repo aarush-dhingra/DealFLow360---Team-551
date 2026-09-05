@@ -110,7 +110,7 @@ export default function DiscountTiersPage() {
                   step={0.1}
                   value={policyForm.manager_max_blended_risk_percent}
                   onChange={(e) => setPolicyForm((f) => ({ ...f, manager_max_blended_risk_percent: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 />
               </div>
               <div>
@@ -118,7 +118,7 @@ export default function DiscountTiersPage() {
                 <select
                   value={policyForm.high_risk_route}
                   onChange={(e) => setPolicyForm((f) => ({ ...f, high_risk_route: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 >
                   <option value="manager_then_finance">Manager then Finance</option>
                   <option value="finance_direct">Finance Direct</option>

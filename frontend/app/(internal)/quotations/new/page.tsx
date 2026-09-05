@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -58,7 +58,7 @@ export default function NewQuotationPage() {
           <select
             value={customer}
             onChange={(e) => setCustomer(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
           >
             <option value="">Select customer…</option>
             {CUSTOMERS.map((c) => <option key={c}>{c}</option>)}
@@ -69,7 +69,7 @@ export default function NewQuotationPage() {
           <select
             value={tier}
             onChange={(e) => setTier(e.target.value as typeof tier)}
-            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
           >
             {TIERS.map((t) => <option key={t}>{t}</option>)}
           </select>
@@ -81,7 +81,7 @@ export default function NewQuotationPage() {
         <label className="block text-xs font-medium text-gray-500 mb-1">Add Product</label>
         <select
           onChange={(e) => { addProduct(e.target.value); e.target.value = ''; }}
-          className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
         >
           <option value="">Select product to add…</option>
           {products.map((p) => <option key={p.id} value={p.id}>{p.name} - ${p.price}</option>)}
@@ -113,7 +113,7 @@ export default function NewQuotationPage() {
                         max={50}
                         value={line.discount}
                         onChange={(e) => updateDiscount(i, Number(e.target.value))}
-                        className="w-16 px-2 py-1 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                        className="w-16 px-2 py-1 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-brand"
                       />
                       <span className="ml-1 text-gray-500">%</span>
                     </td>

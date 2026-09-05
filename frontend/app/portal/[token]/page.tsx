@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -42,12 +42,12 @@ export default function CustomerPortalPage() {
       {/* Minimal portal header - no internal nav */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-6">
-          <span className="font-semibold text-indigo-600">DealFlow360</span>
+          <span className="font-semibold text-gray-900">DealFlow<span className="text-brand">360</span></span>
           <nav className="flex gap-4 text-sm">
             {['My Quotation', 'Messages', 'Profile'].map((item, i) => (
               <span
                 key={item}
-                className={`cursor-pointer ${i === 0 ? 'text-indigo-600 font-medium border-b-2 border-indigo-600 pb-0.5' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`cursor-pointer ${i === 0 ? 'text-brand font-medium border-b-2 border-brand pb-0.5' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 {item}
               </span>
@@ -89,7 +89,7 @@ export default function CustomerPortalPage() {
                         onChange={(e) => updateComment(line, e.target.value)}
                         placeholder="Add a comment or question about this line..."
                         rows={2}
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                       />
                     </td>
                   </tr>
@@ -115,7 +115,7 @@ export default function CustomerPortalPage() {
                   value={counterDiscount}
                   onChange={(e) => setCounterDiscount(e.target.value)}
                   placeholder="e.g. 15"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 />
               </div>
               <div>
@@ -124,7 +124,7 @@ export default function CustomerPortalPage() {
                   type="date"
                   value={deliveryDate}
                   onChange={(e) => setDeliveryDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 />
               </div>
             </div>

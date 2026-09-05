@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-dark: #0F1E3C;
+  --color-brand: #1E87F0;
+  --color-brand-light: #1EA5FF;
+  --color-brand-dim: #0F69E1;
+  --color-brand-50: #EEF6FF;
+  --color-brand-100: #DBEEFF;
+}
+
 :root {
-  --color-primary: #4f46e5;
-  --color-primary-light: #eef2ff;
+  --color-primary: #1E87F0;
+  --color-primary-light: #EEF6FF;
 }
 
 * {

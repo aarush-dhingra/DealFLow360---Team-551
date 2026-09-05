@@ -10,7 +10,7 @@ export function Badge({ children, variant = 'gray' }: { children: React.ReactNod
     orange: 'bg-orange-100 text-orange-800',
     green: 'bg-emerald-100 text-emerald-800',
     red: 'bg-red-100 text-red-700',
-    blue: 'bg-indigo-100 text-indigo-700',
+    blue: 'bg-brand-50 text-brand-dim',
     gray: 'bg-gray-100 text-gray-700',
   };
   return (
@@ -118,7 +118,7 @@ export function Button({
   disabled?: boolean;
 }) {
   const cls: Record<BtnVariant, string> = {
-    primary: 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500',
+    primary: 'bg-brand text-white hover:bg-brand-dim focus:ring-brand',
     secondary: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
     danger: 'bg-red-500 text-white hover:bg-red-600',
     warning: 'bg-amber-500 text-white hover:bg-amber-600',
@@ -171,13 +171,13 @@ export function PipelineStep({ steps, current }: { steps: string[]; current: num
                 i < current
                   ? 'bg-emerald-500 border-emerald-500 text-white'
                   : i === current
-                  ? 'bg-indigo-600 border-indigo-600 text-white'
+                  ? 'bg-brand border-brand text-white'
                   : 'bg-white border-gray-300 text-gray-400'
               }`}
             >
               {i < current ? '✓' : i + 1}
             </div>
-            <span className={`text-xs ${i === current ? 'text-indigo-600 font-medium' : 'text-gray-400'}`}>{step}</span>
+            <span className={`text-xs ${i === current ? 'text-brand font-medium' : 'text-gray-400'}`}>{step}</span>
           </div>
           {i < steps.length - 1 && (
             <div className={`flex-1 h-0.5 mb-4 ${i < current ? 'bg-emerald-400' : 'bg-gray-200'}`} />

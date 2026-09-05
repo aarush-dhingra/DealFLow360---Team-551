@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -27,7 +27,7 @@ export default function InvoicesPage() {
         <Table headers={['Invoice #', 'Customer', 'Amount', 'Status', 'Due Date']}>
           {displayed.map((inv) => (
             <Tr key={inv.id} onClick={() => router.push(`/invoices/${inv.id}`)} clickable>
-              <Td className="font-medium text-indigo-600">{inv.id}</Td>
+              <Td className="font-medium text-brand">{inv.id}</Td>
               <Td>{inv.customer}</Td>
               <Td>${inv.amount.toLocaleString()}</Td>
               <Td>
