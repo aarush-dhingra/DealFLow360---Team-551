@@ -14,7 +14,7 @@ export const updateCategorySchema = z.object({
 
 export const updateApprovalPolicySchema = z.object({
   manager_max_blended_risk_percent: z.number().min(0).max(100),
-  high_risk_route: z.enum(['manager_then_finance', 'finance_direct']),
+  high_risk_route: z.literal('manager_then_finance'),
 });
 
 export const listQuerySchema = z.object({

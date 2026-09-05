@@ -23,12 +23,22 @@ type Detail = Quote & {
   version?: { lines: Line[]; grand_total: string; currency_code: string };
 };
 
-type Message = {
+type OfferVersion = {
+  version_number: number;
+  currency_code: string;
+  grand_total: string;
+  lines: Array<{ description: string; product_name: string; quantity: string; net_line_value: string }>;
+};
+
+type NegotiationRequest = {
   id: string;
-  origin: 'internal' | 'customer';
-  message_text: string;
+  status: string;
+  counter_discount_percent: string | null;
+  requested_delivery_date: string | null;
+  risk_preview_percent: string;
+  risk_preview_route: string;
   created_at: string;
-  requested_discount_percent?: string;
+  line_requests: Array<{ line_id: string; product_name: string; comment: string }>;
 };
 
 type QuoteRequest = { id: string; message: string; status: string; created_at: string };
@@ -56,7 +66,8 @@ export default function CustomerPortalHome() {
 
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [selected, setSelected] = useState<Detail | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [initialOffer, setInitialOffer] = useState<OfferVersion | null>(null);
+  const [negotiationRequests, setNegotiationRequests] = useState<NegotiationRequest[]>([]);
   const [tier, setTier] = useState<TierProgress | null>(null);
   const [tab, setTab] = useState<Tab>('outstanding');
   const [error, setError] = useState('');
@@ -98,19 +109,21 @@ export default function CustomerPortalHome() {
     quotes.filter((q) =>
       tab === 'completed' ? COMPLETE.has(q.status) :
       tab === 'negotiations' ? q.status === 'under_negotiation' :
-      !COMPLETE.has(q.status)
+      !COMPLETE.has(q.status) && q.status !== 'under_negotiation'
     ),
     [quotes, tab]
   );
 
   async function select(q: Quote) {
     try {
-      const [detail, thread] = await Promise.all([
+      const [detail, original, requests] = await Promise.all([
         api.get<{ quote: Detail }>(`/portal/quotes/${q.id}`),
-        api.get<{ messages: Message[] }>(`/portal/quotes/${q.id}/messages`),
+        api.get<{ version: OfferVersion }>(`/portal/quotes/${q.id}/versions/1`).catch(() => ({ version: null })),
+        api.get<{ requests: NegotiationRequest[] }>(`/portal/quotes/${q.id}/negotiation-requests`).catch(() => ({ requests: [] })),
       ]);
       setSelected(detail.quote);
-      setMessages(thread.messages);
+      setInitialOffer(original.version);
+      setNegotiationRequests(requests.requests);
       setMessage('');
       setDiscount('');
       setActiveLine(null);
@@ -121,6 +134,10 @@ export default function CustomerPortalHome() {
 
   async function submitRequest() {
     if (!selected || (!message.trim() && !discount && !deliveryDate)) return;
+    if (message.trim() && !activeLine) {
+      setError('Choose the line this comment applies to before submitting your request.');
+      return;
+    }
     setSubmitting(true);
     try {
       await api.post(`/portal/quotes/${selected.id}/negotiation-requests`, {
@@ -341,26 +358,34 @@ export default function CustomerPortalHome() {
                     </div>
                   )}
 
-                  {/* Message thread */}
+                  {/* Offer and structured negotiation history */}
                   <div className="mb-4">
-                    <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Negotiation thread</p>
-                    {messages.length === 0 ? (
-                      <p className="text-sm text-gray-400 italic">No messages yet.</p>
-                    ) : (
-                      <div className="max-h-44 overflow-y-auto space-y-2">
-                        {messages.map((m) => (
-                          <div
-                            key={m.id}
-                            className={`p-2 rounded-lg text-sm ${m.origin === 'customer' ? 'bg-brand-50 ml-8' : 'bg-gray-100 mr-8'}`}
-                          >
-                            <p className="text-gray-800">{m.message_text}</p>
-                            {m.requested_discount_percent && (
-                              <p className="text-xs mt-1 text-gray-500">Requested discount: {m.requested_discount_percent}%</p>
-                            )}
+                    <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Offer &amp; request history</p>
+                    <div className="space-y-2">
+                      {initialOffer && (
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+                          <div className="flex justify-between gap-3"><span className="font-medium text-gray-800">Initial offer · v{initialOffer.version_number}</span><span className="font-medium text-gray-800">{initialOffer.currency_code} {Number(initialOffer.grand_total).toFixed(2)}</span></div>
+                          <p className="mt-1 text-xs text-gray-500">The original terms sent by your sales representative.</p>
+                        </div>
+                      )}
+                      {initialOffer && selected.version && initialOffer.version_number !== selected.version.version_number && (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+                          <div className="flex justify-between gap-3"><span className="font-medium text-blue-900">Current offer · v{selected.version.version_number}</span><span className="font-medium text-blue-900">{selected.version.currency_code} {Number(selected.version.grand_total).toFixed(2)}</span></div>
+                          <p className="mt-1 text-xs text-blue-700">This is the latest revised offer for your review.</p>
+                        </div>
+                      )}
+                      {negotiationRequests.map((request, index) => (
+                        <div key={request.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+                          <div className="flex justify-between gap-3"><span className="font-medium text-amber-900">Your request #{index + 1}</span><Badge variant={request.status === 'open' ? 'yellow' : 'gray'}>{request.status}</Badge></div>
+                          <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-amber-900">
+                            <span>Counter discount: {request.counter_discount_percent ?? '—'}%</span>
+                            <span>Delivery: {request.requested_delivery_date ?? '—'}</span>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          {request.line_requests.map((line) => <p key={line.line_id} className="mt-2 text-xs text-gray-700"><span className="font-medium">{line.product_name}:</span> {line.comment}</p>)}
+                        </div>
+                      ))}
+                      {negotiationRequests.length === 0 && <p className="text-sm text-gray-400">No change requests submitted yet.</p>}
+                    </div>
                   </div>
 
                   {/* Negotiation form */}
@@ -374,12 +399,13 @@ export default function CustomerPortalHome() {
                       )}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
-                          {activeLine ? `Comment on ${activeLine.product_name}` : 'Message / change request'}
+                          {activeLine ? `Request for ${activeLine.product_name}` : 'Line-specific request'}
                         </label>
                         <textarea
                           value={message}
                           onChange={(e) => setMessage(e.target.value)}
-                          placeholder="Ask a question or propose a change…"
+                          placeholder={activeLine ? 'Describe the change you need…' : 'Select an order line above first'}
+                          disabled={!activeLine}
                           rows={3}
                           className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                         />
@@ -401,7 +427,7 @@ export default function CustomerPortalHome() {
                         <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
                       </div>
                       <div className="flex gap-2 flex-wrap">
-                        <Button variant="secondary" onClick={submitRequest} disabled={submitting || (!message.trim() && !discount && !deliveryDate)}>
+                        <Button variant="secondary" onClick={submitRequest} disabled={submitting || (!message.trim() && !discount && !deliveryDate) || (message.trim() && !activeLine)}>
                           {submitting ? 'Sending…' : 'Submit Request'}
                         </Button>
                         {['sent_to_customer', 'approved'].includes(selected.status) && (

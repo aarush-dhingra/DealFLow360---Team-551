@@ -8,6 +8,7 @@ import { PageHeader, Badge, RiskBadge, InfoBanner, Button, Card } from '@/compon
 
 interface QuoteLine {
   id: string;
+  product_id: string;
   line_number: number;
   name?: string;
   product_name?: string;
@@ -77,7 +78,7 @@ const bandColor: Record<string, string> = {
 };
 
 // Rep can edit these statuses; manager/finance always read-only
-const REP_EDITABLE = new Set(['draft', 'returned_for_revision', 'negotiation']);
+const REP_EDITABLE = new Set(['draft', 'returned_for_revision', 'under_negotiation']);
 
 function safeNum(v: string | number | null | undefined): number {
   const n = parseFloat(String(v ?? '0'));
@@ -145,7 +146,7 @@ export default function QuotationDetailPage() {
         setTimeline(timelineRes.data ?? []);
         setNegotiationRequests(requestRes.data ?? []);
         setEditLines(detailRes.data.lines.map((l) => ({
-          productId: l.id,
+          productId: l.product_id,
           productName: l.name ?? l.product_name ?? l.sku,
           sku: l.sku,
           quantity: safeNum(l.quantity),
@@ -172,7 +173,7 @@ export default function QuotationDetailPage() {
       const body = {
         discountMode: 'line',
         currencyCode: detail.version.currency_code,
-        reason: detail.quote.status === 'negotiation' ? 'Agreed terms with customer' : 'Revised after feedback',
+        reason: detail.quote.status === 'under_negotiation' ? 'Agreed terms with customer' : 'Revised after feedback',
         expectedLockVersion: detail.quote.lock_version,
         lines: editLines.map((l) => ({
           productId: l.productId,
@@ -206,7 +207,8 @@ export default function QuotationDetailPage() {
     returned_for_revision: 'Returned for Revision',
     approved: 'Approved',
     rejected: 'Rejected',
-    negotiation: 'Under Negotiation',
+    under_negotiation: 'Under Negotiation',
+    sent_to_customer: 'Initial Offer Sent',
     paid: 'Paid',
     confirmed: 'Confirmed',
     in_fulfillment: 'In Fulfillment',
@@ -238,9 +240,9 @@ export default function QuotationDetailPage() {
           This quote was returned for revision. Edit the lines below and click <strong>Update</strong> to resubmit — the system will auto-route based on your discount.
         </div>
       )}
-      {detail.quote.status === 'negotiation' && !isViewer && (
+      {detail.quote.status === 'under_negotiation' && !isViewer && (
         <div className="mb-4 px-4 py-3 bg-purple-50 border border-purple-300 rounded-lg text-sm text-purple-800">
-          <strong>Customer has submitted a counter offer.</strong> Review the timeline below for their request, adjust the discount if you agree, then click <strong>Update</strong> to submit. The system will auto-route — confirmed directly if within threshold, or sent for approval if it exceeds it.
+          <strong>Customer has submitted a structured request.</strong> Review it below, adjust the quote if you agree, then click <strong>Update</strong>. A safe revision becomes a new customer offer; an exception is forwarded for the required approval.
         </div>
       )}
 
@@ -359,7 +361,7 @@ export default function QuotationDetailPage() {
       )}
       {isEditable && risk === 'LOW' && REP_EDITABLE.has(detail.quote.status) && (
         <InfoBanner>
-          Discount is within threshold — clicking <strong>Update</strong> will confirm the order directly with no approval needed.
+          Discount is within threshold — clicking <strong>Update</strong> will send the revised offer to the customer. Only the customer can confirm the order.
         </InfoBanner>
       )}
 

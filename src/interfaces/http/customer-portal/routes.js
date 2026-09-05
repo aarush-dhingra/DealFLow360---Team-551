@@ -12,6 +12,7 @@ customerPortalRouter.get('/quotes', requireAuth, requireRole(...portal), portalC
 customerPortalRouter.get('/quotes/:id', requireAuth, requireRole(...portal), portalController.getQuote);
 customerPortalRouter.get('/quotes/:id/versions/:n', requireAuth, requireRole(...portal), portalController.getVersion);
 customerPortalRouter.get('/quotes/:id/messages', requireAuth, requireRole(...portal), portalController.getMessages);
+customerPortalRouter.get('/quotes/:id/negotiation-requests', requireAuth, requireRole(...portal), portalController.getNegotiationRequests);
 customerPortalRouter.post('/quotes/:id/accept', requireAuth, requireRole(...portal), portalController.acceptQuotation);
 customerPortalRouter.post('/quotes/:id/counter', requireAuth, requireRole(...portal), portalController.submitCounterOffer);
 customerPortalRouter.post('/quotes/:id/negotiation-requests', requireAuth, requireRole(...portal), portalController.submitStructuredNegotiation);

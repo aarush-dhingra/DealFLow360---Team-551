@@ -43,7 +43,7 @@ export default function DiscountTiersPage() {
         setDealHealthPolicy(dh.policy);
         setPolicyForm({
           manager_max_blended_risk_percent: p.policy.manager_max_blended_risk_percent,
-          high_risk_route: p.policy.high_risk_route,
+          high_risk_route: 'manager_then_finance',
         });
       })
       .catch((err) => setError(err.message))
@@ -127,14 +127,8 @@ export default function DiscountTiersPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">High risk route</label>
-                <select
-                  value={policyForm.high_risk_route}
-                  onChange={(e) => setPolicyForm((f) => ({ ...f, high_risk_route: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-                >
-                  <option value="manager_then_finance">Manager then Finance</option>
-                  <option value="finance_direct">Finance Direct</option>
-                </select>
+                <div className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-700">Manager → Finance</div>
+                <p className="mt-1 text-xs text-gray-500">Finance review always follows manager approval.</p>
               </div>
             </div>
           </Card>

@@ -73,19 +73,16 @@ export async function customerSignup(request, response, next) {
 
       await client.query('INSERT INTO user_roles (user_id, role) VALUES ($1, $2)', [user.id, 'customer_portal']);
 
-      // Auto-create a customer profile so the portal resolves correctly
-      const { rows: tierRows } = await client.query(`SELECT id FROM customer_tiers WHERE code = 'bronze' LIMIT 1`);
-      const tierId = tierRows[0]?.id;
-      if (tierId) {
-        const { rows: custRows } = await client.query(
-          `INSERT INTO customers (legal_name, tier_id) VALUES ($1, $2) RETURNING id`,
-          [displayName, tierId]
-        );
-        await client.query(
-          `INSERT INTO customer_contacts (customer_id, email, display_name) VALUES ($1, $2, $3)`,
-          [custRows[0].id, email, displayName]
-        );
-      }
+      // Customers start with no tier. Qualification runs from completed-order
+      // milestones, unless an administrator explicitly assigns a tier.
+      const { rows: custRows } = await client.query(
+        `INSERT INTO customers (legal_name, tier_id, tier_assignment_source) VALUES ($1, NULL, 'automatic') RETURNING id`,
+        [displayName]
+      );
+      await client.query(
+        `INSERT INTO customer_contacts (customer_id, email, display_name) VALUES ($1, $2, $3)`,
+        [custRows[0].id, email, displayName]
+      );
 
       await client.query('COMMIT');
     } catch (err) {

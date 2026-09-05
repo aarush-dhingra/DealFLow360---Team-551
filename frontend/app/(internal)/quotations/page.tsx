@@ -20,29 +20,31 @@ interface QuoteRow {
 
 const STATUS_DISPLAY: Record<string, string> = {
   draft: 'Draft',
+  sent_to_customer: 'Initial Offer Sent',
+  under_negotiation: 'Open Negotiation',
   pending_manager_approval: 'Pending Approval',
   pending_finance_approval: 'Pending Finance',
   escalated: 'Escalated',
   approved: 'Approved',
   returned_for_revision: 'Returned',
   rejected: 'Rejected',
-  negotiation: 'Negotiation',
   paid: 'Paid / Done',
   cancelled: 'Cancelled',
 };
 
 const STATUS_VARIANT: Record<string, 'gray' | 'yellow' | 'green' | 'blue' | 'red'> = {
   draft: 'gray',
+  sent_to_customer: 'blue',
+  under_negotiation: 'blue',
   pending_manager_approval: 'yellow',
   pending_finance_approval: 'yellow',
   approved: 'green',
   returned_for_revision: 'red',
   rejected: 'red',
   confirmed: 'green',
-  negotiation: 'blue',
 };
 
-const KANBAN_COLS = ['draft', 'negotiation', 'escalated', 'approved', 'paid'];
+const KANBAN_COLS = ['draft', 'sent_to_customer', 'under_negotiation', 'escalated', 'paid'];
 
 export default function QuotationsPage() {
   const router = useRouter();

@@ -9,7 +9,7 @@ export function determineRoute(blendedRiskPercent, policy) {
 
   if (risk.lte(managerMax)) return 'manager';
 
-  return policy.high_risk_route === 'finance_direct'
-    ? 'finance_direct'
-    : 'manager_then_finance';
+  // DealFlow360 uses a strict human escalation chain.  Finance never receives
+  // a new quote before the manager has reviewed and approved it.
+  return 'manager_then_finance';
 }

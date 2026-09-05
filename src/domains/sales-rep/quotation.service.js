@@ -60,7 +60,7 @@ export async function createQuoteVersion(client, { quotation, customer, input, a
   const policy = await client.query('SELECT * FROM approval_policies WHERE is_active ORDER BY policy_version DESC LIMIT 1');
   if (!policy.rows[0]) throw new AppError(409, 'MISSING_APPROVAL_POLICY', 'An active approval policy must be configured.');
   const approvalPolicy = policy.rows[0];
-  const route = blended.eq(0) ? 'none' : blended.lte(d(approvalPolicy.manager_max_blended_risk_percent)) ? 'manager' : approvalPolicy.high_risk_route;
+  const route = blended.eq(0) ? 'none' : blended.lte(d(approvalPolicy.manager_max_blended_risk_percent)) ? 'manager' : 'manager_then_finance';
   const assessment = await client.query(`INSERT INTO risk_assessments (quotation_version_id,total_pre_discount_order_value,total_line_excess_value,blended_risk_percent,route,inputs_snapshot,policy_snapshot) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [version.id, amount(preDiscountTotal), amount(excessTotal), percent(blended), route, { lines: resolved.map((line) => ({ requested: percent(line.risk.requested), allowed: percent(line.risk.allowed), overage: percent(line.risk.overage), base: amount(line.risk.base), excess: amount(line.risk.excess) })) }, approvalPolicy]);
   for (const [index, line] of resolved.entries()) await client.query(`INSERT INTO risk_assessment_lines (risk_assessment_id,quotation_line_id,requested_discount_percent,allowed_discount_percent,line_overage_percent,line_base_value,line_excess_value) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [assessment.rows[0].id, lineRows.rows[index].id, percent(line.risk.requested), percent(line.risk.allowed), percent(line.risk.overage), amount(line.risk.base), amount(line.risk.excess)]);
   return { version, assessment: assessment.rows[0] };
@@ -71,8 +71,21 @@ export function quoteNumber() { return `DF-${new Date().toISOString().slice(0,10
 export async function routeApproval(client, { quotation, version, assessment, actorUserId }) {
   await client.query('UPDATE approval_instances SET status=$1 WHERE quotation_version_id <> $2 AND quotation_id=$3 AND status=$4', ['superseded', version.id, quotation.id, 'pending']);
   if (assessment.route === 'none') {
-    await client.query(`UPDATE quotations SET status='approved', last_activity_at=now(), updated_at=now() WHERE id=$1`, [quotation.id]);
-    return 'approved';
+    // A quote within its discount limits has not been accepted by the customer.
+    // It is an initial commercial offer and must remain available for negotiation.
+    await client.query(`UPDATE quotations SET status='sent_to_customer', last_activity_at=now(), updated_at=now() WHERE id=$1`, [quotation.id]);
+    await writeAuditAndOutbox(client, {
+      aggregateType: 'quotation',
+      aggregateId: quotation.id,
+      eventType: 'quotation.sent_to_customer',
+      actorUserId,
+      metadata: {
+        versionNumber: version.version_number,
+        blendedRiskPercent: assessment.blended_risk_percent,
+        route: assessment.route
+      }
+    });
+    return 'sent_to_customer';
   }
   // Approval instances represent work that is actionable now.  For the sequential
   // route, Finance is created only after the Manager has approved; creating both
