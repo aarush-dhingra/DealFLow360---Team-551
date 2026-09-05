@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { routeToRisk, type BackendApprovalRoute } from '@/lib/data';
-import { PageHeader, RiskBadge, Badge, Button, Card, Table, Tr, Td, InfoBanner } from '@/components/ui';
+import { PageHeader, RiskBadge, Badge, Button, Card, Table, Tr, Td, InfoBanner, PipelineStep } from '@/components/ui';
 
 interface ApprovalDetail {
   id: string;
@@ -48,7 +48,7 @@ export default function FinanceApprovalDetailPage() {
     try {
       await api.post(
         `/finance/quotations/${detail.quotation_id}/approvals/${id}/decisions`,
-        { action, reason: reason.trim() }
+        { action, reason: reason.trim() || 'Approved' }
       );
       const msg = { approve: 'Approved by Finance.', reject: 'Rejected.', return_for_revision: 'Returned for revision.' }[action];
       setActionResult(msg);
@@ -84,6 +84,10 @@ export default function FinanceApprovalDetailPage() {
             Total: {detail.version.currency_code} ${parseFloat(detail.version.grand_total).toLocaleString()}
           </Badge>
         )}
+      </div>
+
+      <div className="mb-6">
+        <PipelineStep steps={['Submitted', 'Sales Manager', 'Finance', 'Confirmed']} current={2} />
       </div>
 
       {detail.risk && (
