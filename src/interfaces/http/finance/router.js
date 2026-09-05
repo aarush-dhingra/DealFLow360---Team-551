@@ -7,8 +7,9 @@
  */
 
 import { Router } from 'express';
-import { requireFinance, errorHandler } from './middleware.js';
+import { requireFinance, requireFinanceOrManager, errorHandler } from './middleware.js';
 import { decideApprovalController } from './approval.controller.js';
+import { previewPlanController, allocateFulfillmentController } from './fulfillment.controller.js';
 
 export const financeRouter = Router();
 
@@ -16,6 +17,19 @@ financeRouter.post(
   '/quotations/:quotationId/approvals/:approvalInstanceId/decisions',
   requireFinance,
   decideApprovalController
+);
+
+// Manager may view fulfillment (GET) but not allocate; Finance allocates.
+financeRouter.get(
+  '/fulfillment/quotations/:quotationId/plan',
+  requireFinanceOrManager,
+  previewPlanController
+);
+
+financeRouter.post(
+  '/fulfillment/quotations/:quotationId/allocate',
+  requireFinance,
+  allocateFulfillmentController
 );
 
 // Keep the error envelope local to finance routes.

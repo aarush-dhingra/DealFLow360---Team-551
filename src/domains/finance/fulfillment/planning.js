@@ -24,6 +24,20 @@ function stockKey(warehouseId, productId) {
 }
 
 /**
+ * Pick the expected source warehouse for a backorder: the cheapest active
+ * warehouse that stocks the product (even at zero on-hand), falling back to the
+ * cheapest active warehouse overall. Keeps the NOT NULL warehouse_id invariant
+ * while persisting backorders as allocations with status 'backordered'.
+ */
+export function pickBackorderWarehouse(productId, warehouses, inventory) {
+  const byCost = cheapestByWeight(warehouses);
+  const stocked = new Set(
+    inventory.filter((row) => row.productId === productId).map((row) => row.warehouseId)
+  );
+  return byCost.find((w) => stocked.has(w.id))?.id ?? byCost[0]?.id ?? null;
+}
+
+/**
  * Build warehouse availability map from inventory rows.
  * inventoryRows: [{ warehouseId, productId, quantityOnHand, quantityReserved }]
  */
@@ -106,13 +120,13 @@ export function suggestAllocations({ lines, inventory, warehouses }) {
       remaining = subtract(remaining, take);
     }
 
-    // 3. Anything left becomes a backorder (cheapest warehouse as expected source).
+    // 3. Anything left becomes a backorder (cheapest stocking warehouse as the
+    // expected source; backorder reserves nothing).
     if (gt(remaining, '0')) {
-      const fallback = cheapestByWeight(warehouses)[0];
       allocations.push({
         quotationLineId: line.quotationLineId,
         productId: line.productId,
-        warehouseId: fallback?.id ?? null,
+        warehouseId: pickBackorderWarehouse(line.productId, warehouses, inventory),
         quantity: remaining,
         status: 'backordered'
       });

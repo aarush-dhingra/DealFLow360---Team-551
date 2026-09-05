@@ -26,7 +26,11 @@ export const Errors = {
     new AppError('STALE_VERSION', message, { status: 409 }),
   invalidTransition: (message = 'Invalid state transition.') =>
     new AppError('INVALID_TRANSITION', message, { status: 409 }),
-  conflict: (message = 'Conflict with existing state.') => new AppError('CONFLICT', message, { status: 409 })
+  conflict: (message = 'Conflict with existing state.') => new AppError('CONFLICT', message, { status: 409 }),
+  insufficientStock: (message = 'Requested quantity exceeds available stock.') =>
+    new AppError('INSUFFICIENT_STOCK', message, { status: 422 }),
+  overAllocation: (message = 'Allocation exceeds the ordered line quantity.') =>
+    new AppError('OVER_ALLOCATION', message, { status: 422 })
 };
 
 /** Normalize any thrown value into an AppError (Postgres codes mapped to HTTP). */
