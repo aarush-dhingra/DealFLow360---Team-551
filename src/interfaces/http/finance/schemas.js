@@ -87,3 +87,60 @@ export const issueCreditNoteBody = z.object({
 export const creditNoteParams = z.object({
   creditNoteId: z.string().uuid()
 });
+
+export const subscriptionParams = z.object({
+  subscriptionId: z.string().uuid()
+});
+
+const isoDate = z.string().datetime({ offset: true }).optional();
+
+export const cancelSubscriptionBody = z.object({
+  effectiveDate: isoDate,
+  reason: z.string().trim().max(2000).optional()
+});
+
+export const changeQuantityBody = z.object({
+  newQuantity: z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, 'newQuantity must be a decimal string')
+    .refine((v) => Number(v) > 0, 'newQuantity must be greater than zero'),
+  effectiveDate: isoDate,
+  reason: z.string().trim().max(2000).optional()
+});
+
+export const healthAssessmentParams = z.object({
+  assessmentId: z.string().uuid()
+});
+
+export const healthActionBody = z
+  .object({
+    action: z.enum(['acknowledge', 'escalate', 'resolve']),
+    reason: z.string().trim().max(2000).optional()
+  })
+  .superRefine((data, ctx) => {
+    if (data.action === 'resolve' && !data.reason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reason'],
+        message: 'reason is required to resolve a deal-health alert'
+      });
+    }
+  });
+
+export const financeQueueQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(500).optional()
+});
+
+export const revenueReportQuery = z.object({
+  from: z.string().datetime({ offset: true }).optional(),
+  to: z.string().datetime({ offset: true }).optional(),
+  ownerUserId: z.string().uuid().optional(),
+  status: z
+    .enum(['issued', 'partially_paid', 'paid', 'overdue', 'credited', 'void'])
+    .optional()
+});
+
+export const outstandingReportQuery = z.object({
+  asOf: z.string().datetime({ offset: true }).optional(),
+  ownerUserId: z.string().uuid().optional()
+});

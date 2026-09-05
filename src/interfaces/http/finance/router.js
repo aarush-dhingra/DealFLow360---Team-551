@@ -19,6 +19,17 @@ import {
   issueCreditNoteController,
   applyCreditNoteController
 } from './credit-notes.controller.js';
+import {
+  cancelSubscriptionController,
+  changeQuantityController
+} from './subscriptions.controller.js';
+import {
+  reconciliationController,
+  financeQueueController,
+  healthActionController,
+  revenueReportController,
+  outstandingReportController
+} from './extras.controller.js';
 
 export const financeRouter = Router();
 
@@ -71,6 +82,52 @@ financeRouter.post(
   '/credit-notes/:creditNoteId/apply',
   requireFinance,
   applyCreditNoteController
+);
+
+// F5 — Subscription lifecycle (cancel, mid-cycle quantity change with proration).
+financeRouter.post(
+  '/subscriptions/:subscriptionId/cancel',
+  requireFinance,
+  cancelSubscriptionController
+);
+
+financeRouter.post(
+  '/subscriptions/:subscriptionId/change-quantity',
+  requireFinance,
+  changeQuantityController
+);
+
+// F6 — One-time vs recurring reconciliation of an invoice (read-only).
+financeRouter.get(
+  '/invoices/:invoiceId/reconciliation',
+  requireFinance,
+  reconciliationController
+);
+
+// F7 — Finance deal-health queue and handling actions.
+financeRouter.get(
+  '/deal-health/finance-queue',
+  requireFinance,
+  financeQueueController
+);
+
+financeRouter.post(
+  '/deal-health/:assessmentId/actions',
+  requireFinance,
+  healthActionController
+);
+
+// Reporting — revenue and outstanding/aging reports (read-only).
+financeRouter.get(
+  '/reports/revenue',
+  requireFinance,
+  revenueReportController
+);
+
+financeRouter.get(
+  '/reports/outstanding',
+  requireFinance,
+  outstandingReportController
 );
 
 // Keep the error envelope local to finance routes.
