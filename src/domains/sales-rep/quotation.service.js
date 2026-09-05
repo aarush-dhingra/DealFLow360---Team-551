@@ -74,7 +74,12 @@ export async function routeApproval(client, { quotation, version, assessment, ac
     await client.query(`UPDATE quotations SET status='approved', last_activity_at=now(), updated_at=now() WHERE id=$1`, [quotation.id]);
     return 'approved';
   }
-  const roles = assessment.route === 'manager' ? ['sales_manager'] : assessment.route === 'manager_then_finance' ? ['sales_manager','finance_operations'] : ['finance_operations'];
+  // Approval instances represent work that is actionable now.  For the sequential
+  // route, Finance is created only after the Manager has approved; creating both
+  // here would allow Finance to approve a deal before its required first step.
+  const roles = assessment.route === 'manager' || assessment.route === 'manager_then_finance'
+    ? ['sales_manager']
+    : ['finance_operations'];
   for (const [index, role] of roles.entries()) await client.query(`INSERT INTO approval_instances (quotation_id,quotation_version_id,risk_assessment_id,sequence_number,required_role,status) VALUES ($1,$2,$3,$4,$5,'pending')`, [quotation.id,version.id,assessment.id,index+1,role]);
   const status = roles[0] === 'sales_manager' ? 'pending_manager_approval' : 'pending_finance_approval';
   await client.query('UPDATE quotations SET status=$1,last_activity_at=now(),updated_at=now() WHERE id=$2',[status,quotation.id]);

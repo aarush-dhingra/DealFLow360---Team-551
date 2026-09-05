@@ -1,6 +1,5 @@
 import { pool } from '../../infrastructure/database/pool.js';
-import Decimal from 'decimal.js';
-import { NotFoundError, ForbiddenError, ConflictError, AppError } from '../../shared/http/errors.js';
+import { NotFoundError, ForbiddenError, ConflictError } from '../../shared/http/errors.js';
 import * as repo from './repository.js';
 
 export async function listApprovals({ requiredRole, status, limit, offset } = {}) {
@@ -37,9 +36,6 @@ async function validateApproverAction(approvalId, actorUser) {
 export async function approveQuotation(approvalId, actorUser, reason) {
   const { approval, quotation } = await validateApproverAction(approvalId, actorUser);
 
-  const policy = await repo.getActiveApprovalPolicy();
-  if (!policy) throw new AppError('No active approval policy configured', 500);
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -49,18 +45,15 @@ export async function approveQuotation(approvalId, actorUser, reason) {
 
     let nextQuoteStatus = 'approved';
 
-    if (
-      approval.required_role === 'sales_manager' &&
-      policy.high_risk_route === 'manager_then_finance'
-    ) {
+    if (approval.required_role === 'sales_manager') {
       const { rows: riskRows } = await client.query(
-        `SELECT blended_risk_percent FROM risk_assessments WHERE id = $1`,
+        `SELECT route FROM risk_assessments WHERE id = $1`,
         [approval.risk_assessment_id]
       );
-      const blendedRisk = new Decimal(riskRows[0]?.blended_risk_percent ?? 0);
-      const managerMax = new Decimal(policy.manager_max_blended_risk_percent);
 
-      if (blendedRisk.gt(managerMax)) {
+      // Use the immutable route assessed for this quote version, not today's
+      // active policy. Policy changes must not rewrite an approval already in flight.
+      if (riskRows[0]?.route === 'manager_then_finance') {
         await repo.createFinanceApprovalInstance(
           client,
           approval.quotation_id,
