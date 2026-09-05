@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useRoleGuard } from '@/lib/useRoleGuard';
 import { PageHeader, Badge, Button, Card, Table, Tr, Td, InfoBanner } from '@/components/ui';
@@ -118,8 +118,8 @@ export default function FinanceFulfillmentPage() {
         <Card>
           <Table headers={['Quote', 'Customer', 'Total', 'Status', '']}>
             {quotes.map((q) => (
-              <>
-                <Tr key={q.id} onClick={() => selectQuote(q.id)} clickable>
+              <React.Fragment key={q.id}>
+                <Tr onClick={() => selectQuote(q.id)} clickable>
                   <Td className="font-medium text-brand">{q.quote_number}</Td>
                   <Td>{q.legal_name}</Td>
                   <Td>${q.grand_total ? parseFloat(q.grand_total).toLocaleString() : '-'}</Td>
@@ -194,7 +194,7 @@ export default function FinanceFulfillmentPage() {
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </Table>
         </Card>
