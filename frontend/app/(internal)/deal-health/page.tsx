@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 import { PageHeader, StatCard, Badge, Button, Card, Table, Tr, Td } from '@/components/ui';
 
 interface StalledDeal {
@@ -35,6 +36,7 @@ interface DashboardData {
 }
 
 export default function DealHealthPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -120,7 +122,7 @@ export default function DealHealthPage() {
         <>
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Discount Anomalies</h2>
           <Card className="mb-5">
-            <Table headers={['Quote', 'Customer', 'Rep', 'This Quote Discount', 'Rep Avg', 'Delta']}>
+            <Table headers={['Quote', 'Customer', 'Rep', 'This Quote Discount', 'Rep Avg', 'Delta', 'Action']}>
               {anomalies.map((a, i) => (
                 <Tr key={a.quotation_id ?? i}>
                   <Td className="font-medium text-brand">{a.quote_number}</Td>
@@ -129,6 +131,11 @@ export default function DealHealthPage() {
                   <Td><Badge variant="red">{parseFloat(a.this_quote_discount_percent || '0').toFixed(1)}%</Badge></Td>
                   <Td className="text-gray-500">{parseFloat(a.rep_avg_discount_percent || '0').toFixed(1)}%</Td>
                   <Td><Badge variant="yellow">+{parseFloat(a.delta || '0').toFixed(1)} pts above avg</Badge></Td>
+                  <Td>
+                    <Button variant="warning" onClick={() => router.push('/approvals')}>
+                      Escalate
+                    </Button>
+                  </Td>
                 </Tr>
               ))}
             </Table>

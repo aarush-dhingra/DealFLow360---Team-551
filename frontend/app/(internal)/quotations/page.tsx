@@ -41,7 +41,7 @@ const STATUS_VARIANT: Record<string, 'gray' | 'yellow' | 'green' | 'blue' | 'red
   negotiation: 'blue',
 };
 
-const KANBAN_COLS = ['draft', 'pending_manager_approval', 'pending_finance_approval', 'approved', 'paid'];
+const KANBAN_COLS = ['draft', 'pending_manager_approval', 'pending_finance_approval', 'approved', 'negotiation', 'paid'];
 
 export default function QuotationsPage() {
   const router = useRouter();

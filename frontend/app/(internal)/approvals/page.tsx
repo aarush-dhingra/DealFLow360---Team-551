@@ -60,17 +60,21 @@ export default function ApprovalsPage() {
     <div>
       <PageHeader title="Approvals" subtitle="Every quotation that needed, needs, or has gone through discount approval" />
 
-      <div className="flex items-center gap-3 mb-5">
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as Filter)}
-          className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-brand"
-        >
-          <option value="all">All ({approvals.length})</option>
-          <option value="pending">Pending ({pending.length})</option>
-          <option value="returned">Returned ({returned.length})</option>
-          <option value="approved">Approved ({approved.length})</option>
-        </select>
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
+        {([
+          { key: 'all',      label: 'All',      count: approvals.length, color: 'bg-gray-100 text-gray-700 border-gray-200' },
+          { key: 'pending',  label: 'Pending',  count: pending.length,   color: 'bg-amber-100 text-amber-800 border-amber-300' },
+          { key: 'returned', label: 'Returned', count: returned.length,  color: 'bg-red-100 text-red-700 border-red-300' },
+          { key: 'approved', label: 'Approved', count: approved.length,  color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+        ] as const).map(({ key, label, count, color }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key as Filter)}
+            className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${color} ${filter === key ? 'ring-2 ring-offset-1 ring-brand' : 'opacity-70 hover:opacity-100'}`}
+          >
+            {count} {label}
+          </button>
+        ))}
       </div>
 
       {error && (

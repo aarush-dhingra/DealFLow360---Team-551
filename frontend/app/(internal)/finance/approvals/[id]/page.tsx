@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { routeToRisk, type BackendApprovalRoute } from '@/lib/data';
-import { PageHeader, RiskBadge, Badge, Button, Card, Table, Tr, Td, InfoBanner } from '@/components/ui';
+import { PageHeader, RiskBadge, Badge, Button, Card, Table, Tr, Td, InfoBanner, PipelineStep } from '@/components/ui';
 
 interface ApprovalDetail {
   id: string;
@@ -42,12 +42,13 @@ export default function FinanceApprovalDetailPage() {
   }, [id]);
 
   async function decide(action: 'approve' | 'reject' | 'return_for_revision') {
-    if (!reason.trim() || !detail) return;
+    if (!detail) return;
+    if (action !== 'approve' && !reason.trim()) return;
     setActing(true);
     try {
       await api.post(
         `/finance/quotations/${detail.quotation_id}/approvals/${id}/decisions`,
-        { action, reason: reason.trim() }
+        { action, reason: reason.trim() || 'Approved' }
       );
       const msg = { approve: 'Approved by Finance.', reject: 'Rejected.', return_for_revision: 'Returned for revision.' }[action];
       setActionResult(msg);
@@ -83,6 +84,10 @@ export default function FinanceApprovalDetailPage() {
             Total: {detail.version.currency_code} ${parseFloat(detail.version.grand_total).toLocaleString()}
           </Badge>
         )}
+      </div>
+
+      <div className="mb-6">
+        <PipelineStep steps={['Submitted', 'Sales Manager', 'Finance', 'Confirmed']} current={2} />
       </div>
 
       {detail.risk && (
@@ -170,7 +175,7 @@ export default function FinanceApprovalDetailPage() {
           {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
           <div className="flex gap-3 flex-wrap">
-            <Button variant="primary" onClick={() => decide('approve')} disabled={acting || !reason.trim()}>Approve</Button>
+            <Button variant="primary" onClick={() => decide('approve')} disabled={acting}>Approve</Button>
             <Button variant="warning" onClick={() => decide('return_for_revision')} disabled={acting || !reason.trim()}>Return for Revision</Button>
             <Button variant="danger" onClick={() => decide('reject')} disabled={acting || !reason.trim()}>Reject</Button>
           </div>
