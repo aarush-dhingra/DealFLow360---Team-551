@@ -28,6 +28,30 @@ quoteRouter.get('/meta/products', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+quoteRouter.get('/meta/upsell-suggestions', async (req, res, next) => {
+  try {
+    const ids = String(req.query.productIds ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (ids.length === 0) return res.json({ data: [] });
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+    const { rows } = await pool.query(
+      `SELECT DISTINCT ON (sp.id)
+         ur.id AS rule_id, ur.rule_kind, ur.promotion_tag, ur.rank_weight, ur.minimum_margin_percent,
+         sp.id, sp.name, sp.sku, sp.list_price, sp.unit_name,
+         c.discount_ceiling_percent,
+         ROUND((sp.list_price - sp.standard_cost) / NULLIF(sp.list_price, 0) * 100, 1) AS margin_percent
+       FROM upsell_rules ur
+       JOIN products sp ON sp.id = ur.suggested_product_id
+       JOIN product_categories c ON c.id = sp.category_id
+       WHERE ur.trigger_product_id IN (${placeholders})
+         AND sp.is_active
+         AND sp.id NOT IN (${placeholders})
+       ORDER BY sp.id, ur.rank_weight DESC`,
+      ids
+    );
+    res.json({ data: rows });
+  } catch (err) { next(err); }
+});
+
 quoteRouter.get('/', salesRepController.listQuotations);
 quoteRouter.post('/', requireRole('sales_rep', 'admin'), validate(createQuoteSchema), salesRepController.createQuotation);
 quoteRouter.get('/:quoteId', validate(idParams, 'params'), salesRepController.getQuotation);

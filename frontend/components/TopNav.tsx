@@ -13,7 +13,7 @@ const flatNavItems = [
   { label: 'Dashboard',     href: '/dashboard',             roles: ALL_ROLES },
   { label: 'Quotations',    href: '/quotations',            roles: ['sales_rep', 'sales_manager', 'finance_operations', 'admin'] },
   { label: 'Approvals',     href: '/approvals',             roles: ['sales_manager', 'admin'] },
-  { label: 'Fulfillment',   href: '/fulfillment',           roles: [] },
+  { label: 'Fulfillment',   href: '/fulfillment',           roles: ['finance_operations'] },
   { label: 'Subscriptions', href: '/subscriptions',         roles: ['sales_manager'] },
   { label: 'Invoices',      href: '/invoices',              roles: ['finance_operations'] },
   { label: 'Quote Requests', href: '/quote-requests',       roles: ['sales_manager'] },

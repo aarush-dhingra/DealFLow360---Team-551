@@ -20,7 +20,7 @@ interface FulfillmentOrder {
 }
 
 export default function FulfillmentPage() {
-  useRoleGuard(['sales_manager', 'admin']);
+  useRoleGuard(['sales_manager', 'admin', 'finance_operations']);
 
   const router = useRouter();
   const [orders, setOrders] = useState<FulfillmentOrder[]>([]);

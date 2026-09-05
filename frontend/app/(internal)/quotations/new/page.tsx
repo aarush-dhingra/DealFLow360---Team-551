@@ -28,6 +28,17 @@ interface Line {
   lineDiscountPercent: number;
   maxDiscountPercent: number;
 }
+interface UpsellSuggestion {
+  id: string;
+  name: string;
+  sku: string;
+  list_price: number;
+  unit_name: string;
+  discount_ceiling_percent: number;
+  margin_percent: string | null;
+  promotion_tag: string | null;
+  rule_kind: string;
+}
 
 export default function NewQuotationPage() {
   const router = useRouter();
@@ -37,6 +48,8 @@ export default function NewQuotationPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [suggestions, setSuggestions] = useState<UpsellSuggestion[]>([]);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     api.get<{ data: Customer[] }>('/sales-rep/quotations/meta/customers')
@@ -47,17 +60,36 @@ export default function NewQuotationPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (lines.length === 0) { setSuggestions([]); return; }
+    const ids = lines.map((l) => l.productId).join(',');
+    api.get<{ data: UpsellSuggestion[] }>(`/sales-rep/quotations/meta/upsell-suggestions?productIds=${ids}`)
+      .then((r) => setSuggestions(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setSuggestions([]));
+  }, [lines.map((l) => l.productId).join(',')]);
+
   const selectedCustomer = customers.find((c) => c.id === customerId) ?? null;
 
   function addProduct(productId: string) {
     const p = products.find((x) => x.id === productId);
     if (!p) return;
+    if (lines.some((l) => l.productId === p.id)) return;
     const customerEntitlement = selectedCustomer?.entitlement_discount_percent ?? 100;
     const maxDiscount = Math.min(customerEntitlement, Number(p.discount_ceiling_percent));
     setLines((prev) => [
       ...prev,
       { productId: p.id, productName: p.name, listPrice: Number(p.list_price), quantity: 1, lineDiscountPercent: 0, maxDiscountPercent: maxDiscount },
     ]);
+  }
+
+  function addSuggestion(s: UpsellSuggestion) {
+    const customerEntitlement = selectedCustomer?.entitlement_discount_percent ?? 100;
+    const maxDiscount = Math.min(customerEntitlement, Number(s.discount_ceiling_percent));
+    setLines((prev) => [
+      ...prev,
+      { productId: s.id, productName: s.name, listPrice: Number(s.list_price), quantity: 1, lineDiscountPercent: 0, maxDiscountPercent: maxDiscount },
+    ]);
+    setDismissed((prev) => new Set([...prev, s.id]));
   }
 
   function updateLine(i: number, field: 'quantity' | 'lineDiscountPercent', val: number) {
@@ -70,6 +102,10 @@ export default function NewQuotationPage() {
 
   const total = lines.reduce((sum, l) => sum + l.quantity * l.listPrice * (1 - l.lineDiscountPercent / 100), 0);
   const needsApproval = lines.some((l) => l.lineDiscountPercent > l.maxDiscountPercent);
+
+  const visibleSuggestions = suggestions.filter(
+    (s) => !dismissed.has(s.id) && !lines.some((l) => l.productId === s.id)
+  );
 
   async function save(andSubmit = false) {
     if (!customerId) { setError('Select a customer first.'); return; }
@@ -182,8 +218,54 @@ export default function NewQuotationPage() {
         </Card>
       )}
 
+      {/* Upsell & Cross-sell Suggestions */}
+      {visibleSuggestions.length > 0 && (
+        <div className="mb-5">
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">Upsell and Cross-Sell Suggestions</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {visibleSuggestions.map((s) => {
+              const marginDelta = s.margin_percent ? `+${parseFloat(s.margin_percent).toFixed(1)}% margin` : null;
+              return (
+                <Card key={s.id} className="p-4 border-brand-100">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{s.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{s.sku} · ${Number(s.list_price).toLocaleString()}</p>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        {marginDelta && <Badge variant="green">{marginDelta}</Badge>}
+                        {s.promotion_tag && <Badge variant="blue">{s.promotion_tag}</Badge>}
+                        <Badge variant="gray">{s.rule_kind === 'cross_sell' ? 'Cross-sell' : 'Upsell'}</Badge>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5 shrink-0">
+                      <button
+                        onClick={() => addSuggestion(s)}
+                        className="px-3 py-1.5 bg-brand text-white text-xs font-medium rounded-lg hover:bg-brand-dim transition-colors whitespace-nowrap"
+                      >
+                        + Add to Quote
+                      </button>
+                      <button
+                        onClick={() => setDismissed((prev) => new Set([...prev, s.id]))}
+                        className="px-3 py-1.5 text-gray-400 text-xs hover:text-gray-600 transition-colors text-center"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {lines.length > 0 && (
-        <p className="text-sm font-semibold text-gray-900 mb-4">Total: ${total.toFixed(2)}</p>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm font-semibold text-gray-900">Total: ${total.toFixed(2)}</p>
+          {needsApproval && (
+            <span className="text-xs text-amber-600 font-medium">Discount exceeds threshold — will route for approval</span>
+          )}
+        </div>
       )}
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
@@ -193,7 +275,7 @@ export default function NewQuotationPage() {
           {saving ? 'Saving…' : 'Save Draft'}
         </Button>
         <Button variant="primary" onClick={() => save(true)} disabled={saving}>
-          {saving ? 'Saving…' : 'Update'}
+          {saving ? 'Saving…' : 'Submit'}
         </Button>
       </div>
     </div>
