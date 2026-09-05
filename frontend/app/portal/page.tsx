@@ -65,6 +65,7 @@ export default function CustomerPortalHome() {
   const [activeLine, setActiveLine] = useState<Line | null>(null);
   const [message, setMessage] = useState('');
   const [discount, setDiscount] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // Quote request state
@@ -119,18 +120,19 @@ export default function CustomerPortalHome() {
   }
 
   async function submitRequest() {
-    if (!selected || !message.trim()) return;
+    if (!selected || (!message.trim() && !discount && !deliveryDate)) return;
     setSubmitting(true);
     try {
-      await api.post(`/portal/quotes/${selected.id}/counter`, {
+      await api.post(`/portal/quotes/${selected.id}/negotiation-requests`, {
         lock_version: selected.lock_version,
-        message_text: message,
-        requested_discount_percent: discount ? Number(discount) : undefined,
-        line_id: activeLine?.id ?? undefined,
+        counter_discount_percent: discount ? Number(discount) : null,
+        requested_delivery_date: deliveryDate || null,
+        line_requests: activeLine && message.trim() ? [{ line_id: activeLine.id, comment: message }] : [],
       });
       await select(selected);
       loadQuotes();
       setActiveLine(null);
+      setDeliveryDate('');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not send request.');
     } finally {
@@ -394,8 +396,12 @@ export default function CustomerPortalHome() {
                           className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                         />
                       </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Requested delivery date (optional)</label>
+                        <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+                      </div>
                       <div className="flex gap-2 flex-wrap">
-                        <Button variant="secondary" onClick={submitRequest} disabled={submitting || !message.trim()}>
+                        <Button variant="secondary" onClick={submitRequest} disabled={submitting || (!message.trim() && !discount && !deliveryDate)}>
                           {submitting ? 'Sending…' : 'Submit Request'}
                         </Button>
                         {['sent_to_customer', 'approved'].includes(selected.status) && (

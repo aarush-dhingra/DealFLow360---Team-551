@@ -1,0 +1,6 @@
+CREATE TYPE negotiation_request_status AS ENUM ('open','revised','escalated','closed');
+CREATE TABLE negotiation_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), quotation_id UUID NOT NULL REFERENCES quotations(id), quotation_version_id UUID NOT NULL REFERENCES quotation_versions(id), customer_contact_id UUID NOT NULL REFERENCES customer_contacts(id), status negotiation_request_status NOT NULL DEFAULT 'open', counter_discount_percent NUMERIC(9,4) CHECK (counter_discount_percent BETWEEN 0 AND 100), requested_delivery_date DATE, risk_preview_percent NUMERIC(9,4) NOT NULL DEFAULT 0, risk_preview_route TEXT NOT NULL DEFAULT 'none', created_at TIMESTAMPTZ NOT NULL DEFAULT now(), resolved_at TIMESTAMPTZ
+);
+CREATE TABLE negotiation_request_lines (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), negotiation_request_id UUID NOT NULL REFERENCES negotiation_requests(id) ON DELETE CASCADE, quotation_line_id UUID NOT NULL REFERENCES quotation_lines(id), customer_comment TEXT NOT NULL CHECK (length(customer_comment) BETWEEN 1 AND 2000), UNIQUE(negotiation_request_id, quotation_line_id));
+CREATE INDEX negotiation_requests_quote_idx ON negotiation_requests(quotation_id, status, created_at DESC);

@@ -164,6 +164,7 @@ export async function createRevision(request, response, next) {
         actorUserId: request.principal.id,
         metadata: { version: nextVersion, risk: assessment.blended_risk_percent }
       });
+      await client.query(`UPDATE negotiation_requests SET status='revised', resolved_at=now() WHERE quotation_id=$1 AND status='open'`, [quote.id]);
       return { version, assessment, lockVersion: quote.lock_version + 1 };
     });
     response.status(201).json({ data: result });
@@ -204,6 +205,17 @@ export async function getTimeline(request, response, next) {
       'SELECT * FROM audit_events WHERE quotation_id = $1 ORDER BY occurred_at DESC',
       [quote.id]
     );
+    response.json({ data: rows });
+  } catch (error) { next(error); }
+}
+
+export async function getNegotiationRequests(request, response, next) {
+  try {
+    const quote = await quoteForAccess(pool, request, request.validated.params.quoteId);
+    const { rows } = await pool.query(`SELECT nr.id,nr.status,nr.counter_discount_percent,nr.requested_delivery_date,nr.risk_preview_percent,nr.risk_preview_route,nr.created_at,cc.display_name AS customer_name,
+      COALESCE(json_agg(json_build_object('lineId',nrl.quotation_line_id,'comment',nrl.customer_comment)) FILTER (WHERE nrl.id IS NOT NULL),'[]') AS line_requests
+      FROM negotiation_requests nr JOIN customer_contacts cc ON cc.id=nr.customer_contact_id LEFT JOIN negotiation_request_lines nrl ON nrl.negotiation_request_id=nr.id
+      WHERE nr.quotation_id=$1 GROUP BY nr.id,cc.display_name ORDER BY nr.created_at DESC`, [quote.id]);
     response.json({ data: rows });
   } catch (error) { next(error); }
 }

@@ -34,4 +34,5 @@ quoteRouter.get('/:quoteId', validate(idParams, 'params'), salesRepController.ge
 quoteRouter.post('/:quoteId/revisions', requireRole('sales_rep', 'admin'), validate(idParams, 'params'), validate(revisionSchema), salesRepController.createRevision);
 quoteRouter.post('/:quoteId/submit', requireRole('sales_rep', 'admin'), validate(idParams, 'params'), salesRepController.submitQuotation);
 quoteRouter.get('/:quoteId/timeline', validate(idParams, 'params'), salesRepController.getTimeline);
+quoteRouter.get('/:quoteId/negotiation-requests', validate(idParams, 'params'), salesRepController.getNegotiationRequests);
 quoteRouter.get('/:quoteId/health', validate(idParams, 'params'), salesRepController.getDealHealth);

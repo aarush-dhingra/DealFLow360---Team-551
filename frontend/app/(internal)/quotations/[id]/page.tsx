@@ -65,6 +65,7 @@ interface EditLine {
   lineDiscountPercent: number;
   unitPrice: number;
 }
+interface NegotiationRequest { id:string; status:string; customer_name:string; counter_discount_percent:string|null; requested_delivery_date:string|null; risk_preview_percent:string; risk_preview_route:string; created_at:string; line_requests:Array<{lineId:string;comment:string}> }
 
 const bandColor: Record<string, string> = {
   green: 'text-emerald-600 bg-emerald-50',
@@ -98,6 +99,7 @@ export default function QuotationDetailPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [editLines, setEditLines] = useState<EditLine[]>([]);
+  const [negotiationRequests, setNegotiationRequests] = useState<NegotiationRequest[]>([]);
 
   useEffect(() => {
     const roles = getUser()?.roles ?? [];
@@ -136,10 +138,12 @@ export default function QuotationDetailPage() {
         api.get<{ data: QuoteDetail }>(`/sales-rep/quotations/${id}`),
         api.get<{ data: HealthAssessment | null }>(`/sales-rep/quotations/${id}/health`).catch(() => ({ data: null })),
         api.get<{ data: TimelineEvent[] }>(`/sales-rep/quotations/${id}/timeline`).catch(() => ({ data: [] })),
-      ]).then(([detailRes, healthRes, timelineRes]) => {
+        api.get<{ data: NegotiationRequest[] }>(`/sales-rep/quotations/${id}/negotiation-requests`).catch(() => ({ data: [] })),
+      ]).then(([detailRes, healthRes, timelineRes, requestRes]) => {
         setDetail(detailRes.data);
         setHealth(healthRes.data);
         setTimeline(timelineRes.data ?? []);
+        setNegotiationRequests(requestRes.data ?? []);
         setEditLines(detailRes.data.lines.map((l) => ({
           productId: l.id,
           productName: l.name ?? l.product_name ?? l.sku,
@@ -261,6 +265,10 @@ export default function QuotationDetailPage() {
             </ul>
           </div>
         </Card>
+      )}
+
+      {negotiationRequests.length > 0 && !isViewer && (
+        <Card className="mb-5 border-amber-200 bg-amber-50 p-4"><h2 className="text-sm font-semibold text-amber-900">Structured customer requests</h2><p className="mt-1 text-xs text-amber-800">Apply agreed commercial values below, then update the quote. The revision recalculates the authoritative risk and approval route.</p><div className="mt-3 space-y-3">{negotiationRequests.map((request)=><div key={request.id} className="rounded-lg bg-white border border-amber-100 p-3 text-sm"><div className="flex justify-between gap-3"><span className="font-medium">{request.customer_name}</span><Badge variant={request.status==='open'?'yellow':'gray'}>{request.status}</Badge></div><div className="mt-2 grid sm:grid-cols-3 gap-2 text-xs text-gray-600"><span>Counter discount: {request.counter_discount_percent ?? '—'}%</span><span>Delivery: {request.requested_delivery_date ?? '—'}</span><span>Risk preview: {Number(request.risk_preview_percent).toFixed(1)}% · {request.risk_preview_route}</span></div>{request.line_requests.map((line,i)=><p key={i} className="mt-2 text-gray-700">• {line.comment}</p>)}</div>)}</div></Card>
       )}
 
       {/* Line items */}

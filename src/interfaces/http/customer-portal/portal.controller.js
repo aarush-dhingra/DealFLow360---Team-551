@@ -7,6 +7,7 @@ import {
   acceptQuoteSchema,
   listQuotesQuerySchema,
   threadQuerySchema
+  , structuredNegotiationSchema
 } from './schemas.js';
 import {
   listPortalQuotes,
@@ -96,6 +97,8 @@ export async function submitCounterOffer(req, res, next) {
     created(res, result);
   } catch (err) { next(err); }
 }
+
+export async function submitStructuredNegotiation(req,res,next){try{const x=validate(structuredNegotiationSchema,req.body);const check=await getPortalQuotation(req.user.email,req.params.id);if(!check)throw new NotFoundError('Quote');const {rows:contacts}=await pool.query('SELECT id FROM customer_contacts WHERE customer_id=$1 AND email=$2',[check.customerId,req.user.email]);if(!contacts[0])throw new NotFoundError('Customer contact');const {inTransaction,writeAuditAndOutbox}=await import('../../../infrastructure/database/transaction.js');const output=await inTransaction(async client=>{const {rows}=await client.query(`SELECT q.*,qv.id AS version_id FROM quotations q JOIN quotation_versions qv ON qv.quotation_id=q.id AND qv.version_number=q.current_version_number WHERE q.id=$1 FOR UPDATE`,[req.params.id]);const q=rows[0];if(!q||!['sent_to_customer','approved','under_negotiation'].includes(q.status))throw new Error('Quote is not open for negotiation.');if(q.lock_version!==x.lock_version)throw new Error('Quote changed. Refresh and try again.');const l=(await client.query('SELECT id,line_base_value,allowed_discount_percent FROM quotation_lines WHERE quotation_version_id=$1',[q.version_id])).rows;for(const r of x.line_requests)if(!l.some(v=>v.id===r.line_id))throw new Error('A requested line is not on this quotation.');const discount=x.counter_discount_percent??0,total=l.reduce((s,v)=>s+Number(v.line_base_value),0),excess=l.reduce((s,v)=>s+Number(v.line_base_value)*Math.max(0,discount-Number(v.allowed_discount_percent))/100,0),risk=total?excess/total*100:0;const policy=(await client.query(`SELECT * FROM approval_policies WHERE is_active ORDER BY policy_version DESC LIMIT 1`)).rows[0],route=risk===0?'none':risk<=Number(policy.manager_max_blended_risk_percent)?'manager':policy.high_risk_route;const made=(await client.query(`INSERT INTO negotiation_requests(quotation_id,quotation_version_id,customer_contact_id,counter_discount_percent,requested_delivery_date,risk_preview_percent,risk_preview_route) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,[q.id,q.version_id,contacts[0].id,x.counter_discount_percent??null,x.requested_delivery_date??null,risk,route])).rows[0];for(const r of x.line_requests)await client.query('INSERT INTO negotiation_request_lines(negotiation_request_id,quotation_line_id,customer_comment) VALUES($1,$2,$3)',[made.id,r.line_id,r.comment]);await client.query(`UPDATE quotations SET status='under_negotiation',lock_version=lock_version+1,last_activity_at=now(),updated_at=now() WHERE id=$1`,[q.id]);await writeAuditAndOutbox(client,{aggregateType:'quotation',aggregateId:q.id,eventType:'negotiation.requested',actorUserId:null,beforeState:{status:q.status},afterState:{status:'under_negotiation'},metadata:{quotationId:q.id,negotiationRequestId:made.id,riskPreviewPercent:risk,riskPreviewRoute:route}});return {...made,status:'under_negotiation'};});created(res,{request:output});}catch(err){next(err);}}
 
 export async function createQuoteRequest(req, res, next) {
   try {
