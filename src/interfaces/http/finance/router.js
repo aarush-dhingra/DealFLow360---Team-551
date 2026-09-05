@@ -15,6 +15,10 @@ import {
   consolidateBackordersController
 } from './fulfillment.controller.js';
 import { applyPaymentController, voidInvoiceController } from './payments.controller.js';
+import {
+  issueCreditNoteController,
+  applyCreditNoteController
+} from './credit-notes.controller.js';
 
 export const financeRouter = Router();
 
@@ -54,6 +58,19 @@ financeRouter.post(
   '/invoices/:invoiceId/void',
   requireFinance,
   voidInvoiceController
+);
+
+// Finance issues and applies credit notes against invoices.
+financeRouter.post(
+  '/invoices/:invoiceId/credit-notes',
+  requireFinance,
+  issueCreditNoteController
+);
+
+financeRouter.post(
+  '/credit-notes/:creditNoteId/apply',
+  requireFinance,
+  applyCreditNoteController
 );
 
 // Keep the error envelope local to finance routes.
