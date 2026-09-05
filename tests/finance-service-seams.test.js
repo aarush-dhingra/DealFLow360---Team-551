@@ -11,12 +11,16 @@ import {
   allocateParams,
   applyPaymentBody,
   issueCreditNoteBody,
+  voidInvoiceBody,
+  consolidateBody,
   cancelSubscriptionBody,
   changeQuantityBody,
   healthActionBody,
   revenueReportQuery,
+  outstandingReportQuery,
   financeQueueQuery
 } from '../src/interfaces/http/finance/schemas.js';
+import { voidInvoice } from '../src/domains/finance/payments/service.js';
 
 const principal = { userId: 'u-fin', roles: ['finance_operations'] };
 
@@ -116,6 +120,21 @@ test('reporting seam: revenue rejects from-after-to', async () => {
   assert.equal(err?.code, 'VALIDATION_ERROR');
 });
 
+test('payment seam: void rejects an empty reason', async () => {
+  const err = await voidInvoice({ invoiceId: 'i-1', reason: '  ', principal }).catch((e) => e);
+  assert.equal(err?.code, 'VALIDATION_ERROR');
+});
+
+test('fulfillment seam: allocate rejects an empty reason', async () => {
+  const err = await allocateFulfillment({ quotationId: 'q-1', mode: 'suggested', reason: '', principal }).catch((e) => e);
+  assert.equal(err?.code, 'VALIDATION_ERROR');
+});
+
+test('fulfillment seam: consolidate rejects an empty reason', async () => {
+  const err = await consolidateBackorders({ quotationId: 'q-1', reason: ' ', principal }).catch((e) => e);
+  assert.equal(err?.code, 'VALIDATION_ERROR');
+});
+
 test('schemas: subscription and health bodies validate', () => {
   assert.equal(cancelSubscriptionBody.safeParse({}).success, true);
   assert.equal(cancelSubscriptionBody.safeParse({ effectiveDate: 'nope' }).success, false);
@@ -125,4 +144,11 @@ test('schemas: subscription and health bodies validate', () => {
   assert.equal(healthActionBody.safeParse({ action: 'resolve', reason: 'won' }).success, true);
   assert.equal(financeQueueQuery.safeParse({ limit: 1000 }).success, false);
   assert.equal(revenueReportQuery.safeParse({ status: 'nonsense' }).success, false);
+  assert.equal(voidInvoiceBody.safeParse({ reason: 'entered twice' }).success, true);
+  assert.equal(voidInvoiceBody.safeParse({ reason: '' }).success, true); // optional empty allowed at schema; service guards non-empty when present
+  assert.equal(consolidateBody.safeParse({ reason: 'stock arrived' }).success, true);
+  assert.equal(consolidateBody.safeParse({}).success, true);
+  assert.equal(revenueReportQuery.safeParse({ format: 'csv' }).success, true);
+  assert.equal(revenueReportQuery.safeParse({ format: 'xlsx' }).success, false);
+  assert.equal(outstandingReportQuery.safeParse({ format: 'csv' }).success, true);
 });

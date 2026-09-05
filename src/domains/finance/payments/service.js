@@ -67,8 +67,11 @@ export async function applyPayment({ invoiceId, amount, method, externalReferenc
   });
 }
 
-export async function voidInvoice({ invoiceId, principal }) {
+export async function voidInvoice({ invoiceId, reason, principal }) {
   if (!invoiceId || typeof invoiceId !== 'string') throw Errors.validation('invoiceId is required');
+  if (reason !== undefined && (typeof reason !== 'string' || reason.trim() === '')) {
+    throw Errors.validation('reason must be a non-empty string when provided');
+  }
 
   return withTransaction(async (client) => {
     const invoice = await repo.findInvoice(client, invoiceId);
@@ -98,13 +101,13 @@ export async function voidInvoice({ invoiceId, principal }) {
       requestId: principal.requestId ?? null,
       beforeState: { status: invoice.status },
       afterState: { status: 'void' },
-      metadata: {}
+      metadata: { reason: reason ?? null }
     });
     outbox.record({
       aggregateType: 'invoice',
       aggregateId: invoiceId,
       eventType: 'invoice.voided',
-      payload: { invoiceId, quotationId: invoice.quotationId, voidedAt: new Date().toISOString() }
+      payload: { invoiceId, quotationId: invoice.quotationId, voidedAt: new Date().toISOString(), reason: reason ?? null }
     });
     await audit.flush();
     await outbox.flush();

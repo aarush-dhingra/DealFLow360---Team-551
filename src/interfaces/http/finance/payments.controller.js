@@ -4,7 +4,7 @@
 
 import { applyPayment, voidInvoice } from '../../../domains/finance/payments/service.js';
 import { asyncHandler } from './middleware.js';
-import { parse, invoiceParams, applyPaymentBody } from './schemas.js';
+import { parse, invoiceParams, applyPaymentBody, voidInvoiceBody } from './schemas.js';
 
 export const applyPaymentController = asyncHandler(async (req, res) => {
   const params = parse(invoiceParams, req.params);
@@ -23,8 +23,10 @@ export const applyPaymentController = asyncHandler(async (req, res) => {
 
 export const voidInvoiceController = asyncHandler(async (req, res) => {
   const params = parse(invoiceParams, req.params);
+  const body = parse(voidInvoiceBody, req.body);
   const result = await voidInvoice({
     invoiceId: params.invoiceId,
+    reason: body.reason,
     principal: req.principal
   });
   res.status(200).json({ data: result });

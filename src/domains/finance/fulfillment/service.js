@@ -56,12 +56,15 @@ export async function previewFulfillmentPlan({ quotationId }) {
   });
 }
 
-export async function allocateFulfillment({ quotationId, mode, manualAllocations, principal }) {
+export async function allocateFulfillment({ quotationId, mode, manualAllocations, reason, principal }) {
   if (!MODES.includes(mode)) {
     throw Errors.validation(`mode must be one of: ${MODES.join(', ')}`);
   }
   if (mode === 'manual' && (!Array.isArray(manualAllocations) || manualAllocations.length === 0)) {
     throw Errors.validation('manualAllocations[] is required when mode is "manual"');
+  }
+  if (reason !== undefined && (typeof reason !== 'string' || reason.trim() === '')) {
+    throw Errors.validation('reason must be a non-empty string when provided');
   }
 
   return withTransaction(async (client) => {
@@ -124,7 +127,8 @@ export async function allocateFulfillment({ quotationId, mode, manualAllocations
         eventType: 'fulfillment.manual_override',
         plan,
         quoteStatus: quote.status,
-        quoteStatusAfter: quote.status // override does not re-transition the quote
+        quoteStatusAfter: quote.status, // override does not re-transition the quote
+        reason
       });
       return summarize(liveOrder.id, quote, plan, 'manual', quote.status);
     }
@@ -157,7 +161,8 @@ export async function allocateFulfillment({ quotationId, mode, manualAllocations
       eventType: 'fulfillment.allocated',
       plan,
       quoteStatus: quote.status,
-      quoteStatusAfter
+      quoteStatusAfter,
+      reason
     });
     return summarize(created.id, quote, plan, 'suggested', quoteStatusAfter);
   });
@@ -186,7 +191,7 @@ async function persistAllocations(client, fulfillmentOrderId, allocations) {
 
 async function writeAudit(
   client,
-  { quotationId, orderId, principal, eventType, plan, quoteStatus, quoteStatusAfter }
+  { quotationId, orderId, principal, eventType, plan, quoteStatus, quoteStatusAfter, reason }
 ) {
   const audit = new AuditCollector(client);
   const outbox = new OutboxCollector(client);
@@ -199,7 +204,11 @@ async function writeAudit(
     requestId: principal.requestId ?? null,
     beforeState: { quoteStatus },
     afterState: { quoteStatus: quoteStatusAfter, allocationCount: plan.allocations.length },
-    metadata: { shipmentCount: plan.shipmentCount, shippingCostTotal: plan.shippingCostTotal }
+    metadata: {
+      shipmentCount: plan.shipmentCount,
+      shippingCostTotal: plan.shippingCostTotal,
+      reason: reason ?? null
+    }
   });
   outbox.record({
     aggregateType: 'fulfillment_order',
@@ -210,7 +219,8 @@ async function writeAudit(
       orderId,
       quoteStatusAfter,
       hasBackorder: plan.allocations.some((a) => a.status === 'backordered'),
-      allocationCount: plan.allocations.length
+      allocationCount: plan.allocations.length,
+      reason: reason ?? null
     }
   });
   await audit.flush();
@@ -224,9 +234,12 @@ async function writeAudit(
  * reduced or completed, and any newly covered quantity is reserved and written
  * as an allocated allocation.
  */
-export async function consolidateBackorders({ quotationId, principal }) {
+export async function consolidateBackorders({ quotationId, reason, principal }) {
   if (!quotationId || typeof quotationId !== 'string') {
     throw Errors.validation('quotationId is required');
+  }
+  if (reason !== undefined && (typeof reason !== 'string' || reason.trim() === '')) {
+    throw Errors.validation('reason must be a non-empty string when provided');
   }
   return withTransaction(async (client) => {
     const quote = await repo.findQuote(client, quotationId);
@@ -324,13 +337,13 @@ export async function consolidateBackorders({ quotationId, principal }) {
       requestId: principal.requestId ?? null,
       beforeState: { orderStatus: 'backordered' },
       afterState: { orderStatus, consolidatedQty, consolidatedRows, remainingBackorders: backorders.length },
-      metadata: { at: now }
+      metadata: { at: now, reason: reason ?? null }
     });
     outbox.record({
       aggregateType: 'fulfillment_order',
       aggregateId: order.id,
       eventType: 'fulfillment.backorder_consolidated',
-      payload: { quotationId, orderId: order.id, consolidatedQty, consolidatedRows, orderStatus, at: now }
+      payload: { quotationId, orderId: order.id, consolidatedQty, consolidatedRows, orderStatus, at: now, reason: reason ?? null }
     });
     await audit.flush();
     await outbox.flush();

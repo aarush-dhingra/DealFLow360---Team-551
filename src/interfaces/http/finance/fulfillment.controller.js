@@ -8,7 +8,7 @@ import {
   consolidateBackorders
 } from '../../../domains/finance/fulfillment/service.js';
 import { asyncHandler } from './middleware.js';
-import { parse, allocateParams, allocateBody } from './schemas.js';
+import { parse, allocateParams, allocateBody, consolidateBody } from './schemas.js';
 
 /** GET plan — view recommended split (Manager/Finance). Read-only. */
 export const previewPlanController = asyncHandler(async (req, res) => {
@@ -25,6 +25,7 @@ export const allocateFulfillmentController = asyncHandler(async (req, res) => {
     quotationId: params.quotationId,
     mode: body.mode,
     manualAllocations: body.allocations,
+    reason: body.reason,
     principal: req.principal
   });
 
@@ -33,8 +34,10 @@ export const allocateFulfillmentController = asyncHandler(async (req, res) => {
 
 export const consolidateBackordersController = asyncHandler(async (req, res) => {
   const params = parse(allocateParams, req.params);
+  const body = parse(consolidateBody, req.body);
   const result = await consolidateBackorders({
     quotationId: params.quotationId,
+    reason: body.reason,
     principal: req.principal
   });
   res.status(200).json({ data: result });

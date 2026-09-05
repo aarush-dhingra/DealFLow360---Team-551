@@ -50,7 +50,8 @@ export const manualAllocationItem = z.object({
 export const allocateBody = z
   .object({
     mode: z.enum(['suggested', 'manual']),
-    allocations: z.array(manualAllocationItem).optional()
+    allocations: z.array(manualAllocationItem).optional(),
+    reason: z.string().trim().max(2000).optional()
   })
   .superRefine((data, ctx) => {
     if (data.mode === 'manual' && (!data.allocations || data.allocations.length === 0)) {
@@ -71,6 +72,14 @@ export const allocateBody = z
 
 export const invoiceParams = z.object({
   invoiceId: z.string().uuid()
+});
+
+export const voidInvoiceBody = z.object({
+  reason: z.string().trim().max(2000).optional()
+});
+
+export const consolidateBody = z.object({
+  reason: z.string().trim().max(2000).optional()
 });
 
 export const applyPaymentBody = z.object({
@@ -137,10 +146,12 @@ export const revenueReportQuery = z.object({
   ownerUserId: z.string().uuid().optional(),
   status: z
     .enum(['issued', 'partially_paid', 'paid', 'overdue', 'credited', 'void'])
-    .optional()
+    .optional(),
+  format: z.enum(['json', 'csv']).optional()
 });
 
 export const outstandingReportQuery = z.object({
   asOf: z.string().datetime({ offset: true }).optional(),
-  ownerUserId: z.string().uuid().optional()
+  ownerUserId: z.string().uuid().optional(),
+  format: z.enum(['json', 'csv']).optional()
 });
