@@ -134,7 +134,7 @@ export default function FinanceApprovalDetailPage() {
               {detail.actions.map((entry, i) => (
                 <Tr key={i}>
                   <Td className="font-medium">{entry.actor_display_name}</Td>
-                  <Td>{entry.action}</Td>
+                  <Td className="capitalize">{entry.action.replace(/[._]/g, ' ')}</Td>
                   <Td className="text-gray-400">{new Date(entry.created_at).toLocaleDateString()}</Td>
                   <Td className="text-gray-500">{entry.reason ?? '-'}</Td>
                 </Tr>
@@ -177,8 +177,8 @@ export default function FinanceApprovalDetailPage() {
         </div>
       ) : (
         <div className="mt-6 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
-          Status: <span className="font-medium">{detail.status.replace(/_/g, ' ')}</span>
-          {detail.decision_reason && <span className="ml-2 text-gray-500">- {detail.decision_reason}</span>}
+          <span className="font-medium capitalize">{detail.status.replace(/[._]/g, ' ')}</span>
+          {detail.decision_reason && <span className="ml-2 text-gray-500 italic">"{detail.decision_reason}"</span>}
         </div>
       )}
     </div>

@@ -10,9 +10,9 @@ const ALL_ROLES = ['sales_rep', 'sales_manager', 'finance_operations', 'admin'];
 
 const navItems = [
   { label: 'Dashboard',        href: '/dashboard',          roles: ALL_ROLES },
-  { label: 'Quotations',       href: '/quotations',         roles: ['sales_rep', 'sales_manager', 'admin'] },
+  { label: 'Quotations',       href: '/quotations',         roles: ['sales_rep', 'sales_manager', 'finance_operations', 'admin'] },
   { label: 'Approvals',        href: '/approvals',          roles: ['sales_manager', 'admin'] },
-  { label: 'Fulfillment',      href: '/fulfillment',        roles: ['sales_manager', 'admin'] },
+  { label: 'Fulfillment',      href: '/fulfillment',        roles: ['admin'] },
   { label: 'Subscriptions',    href: '/subscriptions',      roles: ['sales_manager', 'admin'] },
   { label: 'Invoices',         href: '/invoices',           roles: ['finance_operations', 'admin'] },
   { label: 'Deal Health',      href: '/deal-health',        roles: ['sales_manager', 'admin'] },

@@ -115,12 +115,12 @@ export default function DealHealthPage() {
           <h2 className="text-sm font-semibold text-gray-700 mb-2">Discount Anomalies</h2>
           <Card className="mb-5">
             <Table headers={['Quote', 'Customer', 'Blended Risk %', 'Route']}>
-              {anomalies.map((a) => (
-                <Tr key={a.id}>
+              {anomalies.map((a, i) => (
+                <Tr key={a.quote_number ?? i}>
                   <Td className="font-medium text-brand">{a.quote_number}</Td>
                   <Td>{a.customer_name}</Td>
-                  <Td><Badge variant="red">{parseFloat(a.blended_risk_percent).toFixed(1)}%</Badge></Td>
-                  <Td className="text-gray-600">{a.route}</Td>
+                  <Td><Badge variant="red">{(parseFloat(a.blended_risk_percent) || 0).toFixed(1)}%</Badge></Td>
+                  <Td className="text-gray-600">{a.route ?? '—'}</Td>
                 </Tr>
               ))}
             </Table>

@@ -12,13 +12,16 @@ export function notFoundHandler(request, _response, next) {
 }
 
 export function errorHandler(error, request, response, _next) {
-  const status = error instanceof AppError ? error.status : 500;
-  if (status >= 500) console.error(error);
-  response.status(status).json({
+  const httpStatus = Number.isInteger(error.status) && error.status >= 400 && error.status < 600
+    ? error.status
+    : (error instanceof AppError ? error.status : 500);
+  const isKnown = error instanceof AppError || (httpStatus >= 400 && httpStatus < 500);
+  if (httpStatus >= 500) console.error(error);
+  response.status(httpStatus).json({
     error: {
-      code: error instanceof AppError ? error.code : 'INTERNAL_ERROR',
-      message: error instanceof AppError ? error.message : 'Unexpected server error.',
-      ...(error instanceof AppError && error.details ? { details: error.details } : {}),
+      code: error instanceof AppError ? error.code : (error.code ?? 'INTERNAL_ERROR'),
+      message: isKnown ? error.message : 'Unexpected server error.',
+      ...(error.details ? { details: error.details } : {}),
       requestId: request.id
     }
   });

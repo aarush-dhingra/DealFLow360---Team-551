@@ -69,6 +69,7 @@ export default function NewQuotationPage() {
   }
 
   const total = lines.reduce((sum, l) => sum + l.quantity * l.listPrice * (1 - l.lineDiscountPercent / 100), 0);
+  const needsApproval = lines.some((l) => l.lineDiscountPercent > l.maxDiscountPercent);
 
   async function save(andSubmit = false) {
     if (!customerId) { setError('Select a customer first.'); return; }
@@ -137,7 +138,7 @@ export default function NewQuotationPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['Product', 'Qty', 'List Price', 'Discount %', 'Line Total', ''].map((h) => (
+                  {['Product', 'Qty', 'List Price', 'List Total', 'Discount %', 'Discounted Total', ''].map((h) => (
                     <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -153,20 +154,21 @@ export default function NewQuotationPage() {
                           onChange={(e) => updateLine(i, 'quantity', Math.max(1, Number(e.target.value)))}
                           className="w-16 px-2 py-1 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-brand" />
                       </td>
-                      <td className="px-4 py-3 text-gray-600">${line.listPrice}</td>
+                      <td className="px-4 py-3 text-gray-600">${line.listPrice.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-gray-500">${(line.quantity * line.listPrice).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <input type="number" min={0} max={100} value={line.lineDiscountPercent}
                             onChange={(e) => updateLine(i, 'lineDiscountPercent', Number(e.target.value))}
-                            className={`w-16 px-2 py-1 rounded border text-sm focus:outline-none focus:ring-1 ${overThreshold ? 'border-amber-400 focus:ring-amber-400' : 'border-gray-300 focus:ring-brand'}`} />
+                            className={`w-20 px-2 py-1 rounded border text-sm focus:outline-none focus:ring-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${overThreshold ? 'border-amber-400 focus:ring-amber-400' : 'border-gray-300 focus:ring-brand'}`} />
                           <span className="text-gray-500">%</span>
                         </div>
                         <p className={`text-xs mt-0.5 ${overThreshold ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
                           max {line.maxDiscountPercent}%{overThreshold ? ' — approval required' : ''}
                         </p>
                       </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        ${(line.quantity * line.listPrice * (1 - line.lineDiscountPercent / 100)).toFixed(2)}
+                      <td className="px-4 py-3 font-medium text-gray-800">
+                        ${(line.quantity * line.listPrice * (1 - line.lineDiscountPercent / 100)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3">
                         <button onClick={() => removeLine(i)} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
@@ -191,7 +193,7 @@ export default function NewQuotationPage() {
           {saving ? 'Saving…' : 'Save Draft'}
         </Button>
         <Button variant="primary" onClick={() => save(true)} disabled={saving}>
-          {saving ? 'Saving…' : 'Submit for Approval'}
+          {saving ? 'Saving…' : needsApproval ? 'Submit for Approval' : 'Confirm Order'}
         </Button>
       </div>
     </div>

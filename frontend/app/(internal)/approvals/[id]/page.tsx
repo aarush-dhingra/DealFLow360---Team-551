@@ -153,7 +153,7 @@ export default function ApprovalDetailPage() {
               {detail.actions.map((entry, i) => (
                 <Tr key={i}>
                   <Td className="font-medium">{entry.actor_display_name}</Td>
-                  <Td>{entry.action}</Td>
+                  <Td className="capitalize">{entry.action.replace(/[._]/g, ' ')}</Td>
                   <Td className="text-gray-400">{new Date(entry.created_at).toLocaleDateString()}</Td>
                   <Td className="text-gray-500">{entry.reason ?? '-'}</Td>
                 </Tr>
@@ -166,6 +166,19 @@ export default function ApprovalDetailPage() {
       {actionResult ? (
         <div className="px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
           {actionResult}
+        </div>
+      ) : detail.status === 'returned_for_revision' ? (
+        <div className="px-4 py-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800 flex items-center justify-between gap-3">
+          <div>
+            <span className="font-medium">Returned for Revision</span>
+            {detail.decision_reason && <span className="ml-2 text-amber-700">"{detail.decision_reason}"</span>}
+          </div>
+          <button
+            onClick={() => router.push(`/quotations/${detail.quotation_id}`)}
+            className="shrink-0 px-3 py-1.5 rounded-lg border border-amber-400 text-xs font-medium text-amber-900 hover:bg-amber-100 transition-colors"
+          >
+            Open Quotation →
+          </button>
         </div>
       ) : detail.status === 'pending' ? (
         <>
@@ -195,8 +208,8 @@ export default function ApprovalDetailPage() {
         </>
       ) : (
         <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
-          Status: <span className="font-medium">{detail.status.replace(/_/g, ' ')}</span>
-          {detail.decision_reason && <span className="ml-2 text-gray-500">- {detail.decision_reason}</span>}
+          <span className="font-medium capitalize">{detail.status.replace(/_/g, ' ')}</span>
+          {detail.decision_reason && <span className="ml-2 text-gray-500 italic">"{detail.decision_reason}"</span>}
         </div>
       )}
     </div>

@@ -8,11 +8,14 @@ import { PageHeader, Badge, Card, Table, Tr, Td } from '@/components/ui';
 
 interface Invoice {
   id: string;
-  invoice_number: string;
+  invoiceNumber: string;
+  quoteNumber?: string;
   status: string;
-  total_amount: string;
-  due_date: string | null;
-  customer_legal_name: string;
+  amountDue: string;
+  amountPaid?: string;
+  dueAt: string | null;
+  customerName: string;
+  currencyCode?: string;
 }
 
 type Filter = 'all' | 'unpaid' | 'paid';
@@ -41,8 +44,8 @@ export default function InvoicesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const unpaid = invoices.filter((i) => i.status === 'unpaid' || i.status === 'overdue');
-  const paid   = invoices.filter((i) => i.status === 'paid');
+  const unpaid = invoices.filter((i) => ['issued', 'unpaid', 'overdue', 'partially_paid'].includes(i.status));
+  const paid   = invoices.filter((i) => ['paid', 'credited'].includes(i.status));
   const displayed = filter === 'unpaid' ? unpaid : filter === 'paid' ? paid : invoices;
 
   return (
@@ -87,16 +90,18 @@ export default function InvoicesPage() {
                   onClick={() => router.push(`/invoices/${inv.id}`)}
                   className="cursor-pointer hover:bg-gray-50 transition-colors"
                 >
-                  <td className="px-4 py-3 font-medium text-brand">{inv.invoice_number}</td>
-                  <td className="px-4 py-3 text-gray-900">{inv.customer_legal_name}</td>
-                  <td className="px-4 py-3 text-gray-700">${parseFloat(inv.total_amount).toLocaleString()}</td>
+                  <td className="px-4 py-3 font-medium text-brand">{inv.invoiceNumber}</td>
+                  <td className="px-4 py-3 text-gray-900">{inv.customerName}</td>
+                  <td className="px-4 py-3 text-gray-700">
+                    ${parseFloat(inv.amountDue || '0').toLocaleString()}
+                  </td>
                   <td className="px-4 py-3">
-                    <Badge variant={inv.status === 'paid' ? 'green' : inv.status === 'overdue' ? 'red' : 'yellow'}>
-                      {inv.status}
+                    <Badge variant={['paid', 'credited'].includes(inv.status) ? 'green' : inv.status === 'overdue' ? 'red' : 'yellow'}>
+                      {inv.status.replace(/_/g, ' ')}
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-gray-500">
-                    {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '-'}
+                    {inv.dueAt ? new Date(inv.dueAt).toLocaleDateString() : '-'}
                   </td>
                 </tr>
               ))}

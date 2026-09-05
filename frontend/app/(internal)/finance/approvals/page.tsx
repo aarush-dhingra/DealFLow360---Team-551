@@ -13,8 +13,11 @@ interface FinanceApproval {
   required_role: string;
   created_at: string;
   quotation_id: string;
-  quotation: { quote_number: string; customer_name: string; rep_name: string } | null;
-  risk: { blended_risk_percent: string; route: BackendApprovalRoute } | null;
+  quote_number: string;
+  customer_name: string;
+  rep_name: string;
+  blended_risk_percent: string;
+  route: BackendApprovalRoute;
 }
 
 export default function FinanceApprovalsPage() {
@@ -49,13 +52,13 @@ export default function FinanceApprovalsPage() {
         <Card>
           <Table headers={['Quote', 'Customer', 'Rep', 'Blended Risk', 'Risk Level', 'Received']}>
             {approvals.map((a) => {
-              const risk = a.risk ? routeToRisk(a.risk.route) : 'HIGH';
+              const risk = a.route ? routeToRisk(a.route) : 'HIGH';
               return (
                 <Tr key={a.id} onClick={() => router.push(`/finance/approvals/${a.id}`)} clickable>
-                  <Td className="font-medium text-brand">{a.quotation?.quote_number ?? a.quotation_id.slice(0, 8)}</Td>
-                  <Td>{a.quotation?.customer_name ?? '-'}</Td>
-                  <Td className="text-gray-500">{a.quotation?.rep_name ?? '-'}</Td>
-                  <Td>{a.risk ? `${parseFloat(a.risk.blended_risk_percent).toFixed(1)}%` : '-'}</Td>
+                  <Td className="font-medium text-brand">{a.quote_number ?? a.quotation_id.slice(0, 8)}</Td>
+                  <Td>{a.customer_name ?? '-'}</Td>
+                  <Td className="text-gray-500">{a.rep_name ?? '-'}</Td>
+                  <Td>{a.blended_risk_percent ? `${(parseFloat(a.blended_risk_percent) || 0).toFixed(1)}%` : '-'}</Td>
                   <Td><RiskBadge risk={risk} /></Td>
                   <Td className="text-gray-400">{new Date(a.created_at).toLocaleDateString()}</Td>
                 </Tr>

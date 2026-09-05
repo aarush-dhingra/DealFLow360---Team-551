@@ -37,9 +37,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const msg = typeof body.message === 'string' ? body.message
-              : typeof body.error === 'string'   ? body.error
-              : `Request failed (${res.status})`;
+    const msg = typeof body.error?.message === 'string' ? body.error.message
+              : typeof body.message === 'string'        ? body.message
+              : typeof body.error === 'string'          ? body.error
+              : res.status === 409 ? 'This action conflicts with the current state. Please refresh and try again.'
+              : res.status === 422 ? 'The submitted data is invalid. Please check your inputs.'
+              : res.status === 403 ? 'You don\'t have permission to perform this action.'
+              : res.status === 404 ? 'The requested resource was not found.'
+              : 'Something went wrong. Please try again.';
     throw new Error(msg);
   }
   return res.json() as Promise<T>;

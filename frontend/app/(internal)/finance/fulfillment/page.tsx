@@ -41,7 +41,7 @@ export default function FinanceFulfillmentPage() {
   const [plan, setPlan] = useState<FulfillmentPlan | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
   const [acting, setActing] = useState(false);
-  const [actionResult, setActionResult] = useState<Record<string, string>>({});
+  const [actionResult, setActionResult] = useState<Record<string, { message: string; isError: boolean }>>({});
 
   useEffect(() => {
     Promise.all([
@@ -64,7 +64,7 @@ export default function FinanceFulfillmentPage() {
       const res = await api.get<{ data: FulfillmentPlan }>(`/finance/fulfillment/quotations/${quoteId}/plan`);
       setPlan(res.data);
     } catch (err: unknown) {
-      setActionResult((r) => ({ ...r, [quoteId]: err instanceof Error ? err.message : 'Plan load failed' }));
+      setActionResult((r) => ({ ...r, [quoteId]: { message: err instanceof Error ? err.message : 'Plan load failed', isError: true } }));
     } finally {
       setPlanLoading(false);
     }
@@ -74,12 +74,12 @@ export default function FinanceFulfillmentPage() {
     setActing(true);
     try {
       await api.post(`/finance/fulfillment/quotations/${quoteId}/allocate`, { mode: 'suggested' });
-      setActionResult((r) => ({ ...r, [quoteId]: 'Allocated successfully.' }));
+      setActionResult((r) => ({ ...r, [quoteId]: { message: 'Allocated successfully.', isError: false } }));
       setPlan(null);
       setSelected(null);
       setQuotes((qs) => qs.map((q) => q.id === quoteId ? { ...q, status: 'in_fulfillment' } : q));
     } catch (err: unknown) {
-      setActionResult((r) => ({ ...r, [quoteId]: err instanceof Error ? err.message : 'Allocation failed' }));
+      setActionResult((r) => ({ ...r, [quoteId]: { message: err instanceof Error ? err.message : 'Allocation failed', isError: true } }));
     } finally {
       setActing(false);
     }
@@ -92,9 +92,9 @@ export default function FinanceFulfillmentPage() {
         `/finance/fulfillment/quotations/${quoteId}/consolidate-backorders`
       );
       const d = res.data;
-      setActionResult((r) => ({ ...r, [quoteId]: `Consolidated ${d.consolidatedRows} rows. ${d.remainingBackorders} backorders remain.` }));
+      setActionResult((r) => ({ ...r, [quoteId]: { message: `Consolidated ${d.consolidatedRows} rows. ${d.remainingBackorders} backorders remain.`, isError: false } }));
     } catch (err: unknown) {
-      setActionResult((r) => ({ ...r, [quoteId]: err instanceof Error ? err.message : 'Consolidation failed' }));
+      setActionResult((r) => ({ ...r, [quoteId]: { message: err instanceof Error ? err.message : 'Consolidation failed', isError: true } }));
     } finally {
       setActing(false);
     }
@@ -139,7 +139,9 @@ export default function FinanceFulfillmentPage() {
                       {planLoading && <p className="text-sm text-gray-400">Loading fulfillment plan...</p>}
 
                       {actionResult[q.id] && (
-                        <p className="text-sm text-emerald-700 mb-3">{actionResult[q.id]}</p>
+                        <p className={`text-sm mb-3 ${actionResult[q.id].isError ? 'text-red-600' : 'text-emerald-700'}`}>
+                          {actionResult[q.id].message}
+                        </p>
                       )}
 
                       {plan && plan.quotationId === q.id && (

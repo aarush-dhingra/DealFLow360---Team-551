@@ -9,13 +9,15 @@ import { PageHeader, Badge, RiskBadge, InfoBanner, Button, Card } from '@/compon
 interface QuoteLine {
   id: string;
   line_number: number;
-  product_name: string;
+  name?: string;         // backend returns p.name
+  product_name?: string; // fallback alias
   sku: string;
   quantity: string;
   unit_price: string;
   line_discount_percent: string;
-  line_net_total: string;
-  standard_cost: string;
+  line_net_total?: string;
+  net_line_value?: string; // actual backend column name
+  standard_cost?: string;
 }
 
 interface QuoteDetail {
@@ -91,7 +93,7 @@ export default function QuotationDetailPage() {
       setTimeline(timelineRes.data ?? []);
       setEditLines(detailRes.data.lines.map((l) => ({
         productId: l.id,
-        productName: l.product_name,
+        productName: l.name ?? l.product_name ?? l.sku,
         sku: l.sku,
         quantity: safeNum(l.quantity),
         lineDiscountPercent: safeNum(l.line_discount_percent),
@@ -156,8 +158,8 @@ export default function QuotationDetailPage() {
 
   const statusLabel: Record<string, string> = {
     draft: 'Draft',
-    pending_manager_approval: 'Pending Manager',
-    pending_finance_approval: 'Pending Finance',
+    pending_manager_approval: 'Awaiting Manager Approval',
+    pending_finance_approval: 'Awaiting Finance Approval',
     returned_for_revision: 'Returned for Revision',
     approved: 'Approved',
     rejected: 'Rejected',
@@ -184,7 +186,7 @@ export default function QuotationDetailPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Product', 'SKU', 'Qty', 'Unit Price', 'Discount %', 'Net Total'].map((h) => (
+                {['Product', 'SKU', 'Qty', 'Unit Price', 'Discount %', 'Discounted Total'].map((h) => (
                   <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -198,14 +200,14 @@ export default function QuotationDetailPage() {
                     <td className="px-4 py-3">
                       <input type="number" min={1} value={line.quantity}
                         onChange={(e) => updateEditLine(i, 'quantity', Math.max(1, Number(e.target.value)))}
-                        className="w-16 px-2 py-1 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-brand" />
+                        className="w-20 px-2 py-1 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-brand [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
                     </td>
                     <td className="px-4 py-3 text-gray-700">${line.unitPrice.toLocaleString()}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
                         <input type="number" min={0} max={100} value={line.lineDiscountPercent}
                           onChange={(e) => updateEditLine(i, 'lineDiscountPercent', Number(e.target.value))}
-                          className="w-16 px-2 py-1 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-brand" />
+                          className="w-20 px-2 py-1 rounded border border-gray-300 text-sm focus:outline-none focus:ring-1 focus:ring-brand [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
                         <span className="text-gray-500">%</span>
                       </div>
                     </td>
@@ -216,12 +218,14 @@ export default function QuotationDetailPage() {
                 ))
                 : detail.lines.map((line) => (
                   <tr key={line.id}>
-                    <td className="px-4 py-3 font-medium text-gray-900">{line.product_name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{line.name ?? line.product_name ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{line.sku}</td>
                     <td className="px-4 py-3 text-gray-600">{safeNum(line.quantity).toFixed(0)}</td>
                     <td className="px-4 py-3 text-gray-700">${safeNum(line.unit_price).toLocaleString()}</td>
                     <td className="px-4 py-3 text-gray-700">{safeNum(line.line_discount_percent).toFixed(1)}%</td>
-                    <td className="px-4 py-3 font-medium">${safeNum(line.line_net_total).toLocaleString()}</td>
+                    <td className="px-4 py-3 font-medium">
+                      ${(safeNum(line.quantity) * safeNum(line.unit_price) * (1 - safeNum(line.line_discount_percent) / 100)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </td>
                   </tr>
                 ))
               }
@@ -253,9 +257,14 @@ export default function QuotationDetailPage() {
         </span>
       </div>
 
-      {risk !== 'LOW' && (
+      {risk !== 'LOW' && EDITABLE_STATUSES.has(detail.quote.status) && (
         <InfoBanner>
-          Discount exceeds thresholds - this quote will be routed for approval ({risk === 'MEDIUM' ? 'Sales Manager' : 'Sales Manager then Finance'}).
+          Discount exceeds thresholds — submitting will route for approval ({risk === 'MEDIUM' ? 'Sales Manager' : 'Sales Manager then Finance'}).
+        </InfoBanner>
+      )}
+      {risk !== 'LOW' && !EDITABLE_STATUSES.has(detail.quote.status) && detail.quote.status !== 'approved' && detail.quote.status !== 'rejected' && (
+        <InfoBanner>
+          This quote is in the approval pipeline ({risk === 'MEDIUM' ? 'Sales Manager' : 'Sales Manager → Finance'}).
         </InfoBanner>
       )}
 
@@ -300,7 +309,7 @@ export default function QuotationDetailPage() {
                   <li key={ev.id} className="flex gap-3">
                     <div className="mt-1.5 w-2 h-2 rounded-full bg-brand-light shrink-0" />
                     <div>
-                      <p className="text-sm font-medium text-gray-800">{ev.event_type.replace(/_/g, ' ')}</p>
+                      <p className="text-sm font-medium text-gray-800 capitalize">{ev.event_type.replace(/[._]/g, ' ')}</p>
                       <p className="text-xs text-gray-400">{new Date(ev.occurred_at).toLocaleString()}</p>
                     </div>
                   </li>

@@ -84,33 +84,44 @@ export default function ApprovalsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Quotation', 'Customer', 'Blended Risk', 'Stage', 'Rep'].map((h) => (
+                {['Quotation', 'Customer', 'Blended Risk', 'Stage', 'Status', 'Rep'].map((h) => (
                   <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
               )}
-              {!loading && displayed.map((a) => (
-                <tr
-                  key={a.id}
-                  onClick={() => router.push(`/approvals/${a.id}`)}
-                  className="cursor-pointer hover:bg-gray-50 transition-colors"
-                >
-                  <td className="px-4 py-3 font-medium text-brand">{a.quote_number}</td>
-                  <td className="px-4 py-3 text-gray-900">{a.customer_name}</td>
-                  <td className="px-4 py-3">
-                    <RiskBadge risk={routeToRisk(a.route)} />
-                    <span className="ml-1.5 text-xs text-gray-400">{parseFloat(a.blended_risk_percent).toFixed(1)}%</span>
-                  </td>
-                  <td className="px-4 py-3">{stageLabel(a)}</td>
-                  <td className="px-4 py-3 text-gray-600">{a.rep_name}</td>
-                </tr>
-              ))}
+              {!loading && displayed.map((a) => {
+                const isDone = ['approved', 'escalated', 'rejected', 'returned_for_revision'].includes(a.status);
+                const statusBadge = {
+                  pending: <Badge variant="yellow">Pending</Badge>,
+                  approved: <Badge variant="green">Approved</Badge>,
+                  escalated: <Badge variant="blue">Escalated</Badge>,
+                  rejected: <Badge variant="red">Rejected</Badge>,
+                  returned_for_revision: <Badge variant="gray">Returned</Badge>,
+                }[a.status] ?? <Badge variant="gray">{a.status}</Badge>;
+                return (
+                  <tr
+                    key={a.id}
+                    onClick={() => router.push(`/approvals/${a.id}`)}
+                    className={`cursor-pointer hover:bg-gray-50 transition-colors ${isDone ? 'opacity-60' : ''}`}
+                  >
+                    <td className="px-4 py-3 font-medium text-brand">{a.quote_number}</td>
+                    <td className="px-4 py-3 text-gray-900">{a.customer_name}</td>
+                    <td className="px-4 py-3">
+                      <RiskBadge risk={routeToRisk(a.route)} />
+                      <span className="ml-1.5 text-xs text-gray-400">{(parseFloat(a.blended_risk_percent) || 0).toFixed(1)}%</span>
+                    </td>
+                    <td className="px-4 py-3">{stageLabel(a)}</td>
+                    <td className="px-4 py-3">{statusBadge}</td>
+                    <td className="px-4 py-3 text-gray-600">{a.rep_name}</td>
+                  </tr>
+                );
+              })}
               {!loading && displayed.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No approvals in this filter</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No approvals in this filter</td></tr>
               )}
             </tbody>
           </table>

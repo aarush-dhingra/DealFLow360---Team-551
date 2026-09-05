@@ -8,12 +8,15 @@ import { PageHeader, Badge, Card } from '@/components/ui';
 
 interface FulfillmentOrder {
   id: string;
-  fulfillment_order_number?: string;
   status: string;
+  quotationId?: string;
+  quoteNumber?: string;
+  customerName?: string;
+  // snake_case fallbacks
   customer_legal_name?: string;
   customer_name?: string;
+  createdAt?: string;
   created_at?: string;
-  quotation_id?: string;
 }
 
 export default function FulfillmentPage() {
@@ -79,16 +82,18 @@ export default function FulfillmentPage() {
                   className="cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <td className="px-4 py-3 font-medium text-brand">
-                    {order.fulfillment_order_number ?? order.id}
+                    {order.quoteNumber ?? order.id.slice(0, 8)}
                   </td>
                   <td className="px-4 py-3 text-gray-900">
-                    {order.customer_legal_name ?? order.customer_name ?? '—'}
+                    {order.customerName ?? order.customer_legal_name ?? order.customer_name ?? '—'}
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={statusVariant(order.status)}>{order.status.replace(/_/g, ' ')}</Badge>
                   </td>
                   <td className="px-4 py-3 text-gray-500">
-                    {order.created_at ? new Date(order.created_at).toLocaleDateString() : '—'}
+                    {(order.createdAt ?? order.created_at)
+                      ? new Date((order.createdAt ?? order.created_at)!).toLocaleDateString()
+                      : '—'}
                   </td>
                 </tr>
               ))}
