@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { PageHeader, StatCard, Button, Card } from '@/components/ui';
 
@@ -18,7 +18,7 @@ export default function ReportsPage() {
           ].map((f) => (
             <div key={f.label}>
               <label className="block text-xs font-medium text-gray-500 mb-1">{f.label}</label>
-              <select className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+              <select className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-brand">
                 <option>{f.placeholder}</option>
               </select>
             </div>

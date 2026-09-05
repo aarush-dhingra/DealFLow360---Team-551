@@ -37,13 +37,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-brand-50 flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-3">
             <Image src="/logo-256.png" alt="DealFlow360" width={72} height={72} className="rounded-xl" priority />
           </div>
-          <h1 className="text-2xl font-bold text-indigo-600">DealFlow360</h1>
+          <h1 className="text-2xl font-bold text-gray-900">DealFlow<span className="text-brand">360</span></h1>
           <p className="mt-1 text-sm text-gray-500">Sales Operations Platform</p>
         </div>
 
@@ -77,7 +77,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
               />
             </div>
             <div>
@@ -88,13 +88,13 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60"
+              className="w-full bg-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-brand-dim transition-colors disabled:opacity-60"
             >
               {loading ? 'Signing in...' : tab === 'login' ? 'Log In' : 'Create Account'}
             </button>
@@ -105,6 +105,14 @@ export default function LoginPage() {
             )}
           </form>
         </div>
+
+        {/* DEV ONLY - remove before demo */}
+        <button
+          onClick={() => { localStorage.setItem('df360_token', 'dev'); localStorage.setItem('df360_user', JSON.stringify({ id: 'dev', email: 'dev@local', displayName: 'Dev User', roles: ['admin'] })); router.push('/dashboard'); }}
+          className="mt-3 w-full text-xs text-gray-400 hover:text-brand transition-colors"
+        >
+          Skip to Dashboard (dev only)
+        </button>
 
         <p className="mt-4 text-center text-xs text-gray-400">
           After login, internal users land on the Sales Dashboard.

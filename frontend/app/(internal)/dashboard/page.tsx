@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { PageHeader, StatCard, Card } from '@/components/ui';
 import { quotations, dealHealthAlerts } from '@/lib/data';
 
@@ -34,7 +34,7 @@ export default function DashboardPage() {
       <div className="flex gap-3 mb-6">
         <Link
           href="/quotations"
-          className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+          className="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dim transition-colors"
         >
           + New Quotation
         </Link>
@@ -48,11 +48,11 @@ export default function DashboardPage() {
 
       {/* Recent Activity */}
       <Card className="p-5">
-        <h2 className="text-sm font-semibold text-indigo-600 mb-3">Recent Activity</h2>
+        <h2 className="text-sm font-semibold text-brand mb-3">Recent Activity</h2>
         <ul className="space-y-2">
           {recentActivity.map((item) => (
             <li key={item} className="flex items-start gap-2 text-sm text-gray-600">
-              <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+              <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-brand-light shrink-0" />
               {item}
             </li>
           ))}

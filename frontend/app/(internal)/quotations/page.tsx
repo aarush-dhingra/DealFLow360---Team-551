@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -103,7 +103,7 @@ function KanbanView({ quotes, onOpen }: { quotes: QuoteRow[]; onOpen: (id: strin
               {cards.map((q) => (
                 <Card
                   key={q.id}
-                  className="p-3 cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all"
+                  className="p-3 cursor-pointer hover:shadow-md hover:border-brand-100 transition-all"
                   // @ts-expect-error - Card is a div
                   onClick={() => onOpen(q.id)}
                 >
@@ -146,7 +146,7 @@ function TableView({ quotes, onOpen }: { quotes: QuoteRow[]; onOpen: (id: string
           <tbody className="divide-y divide-gray-100">
             {quotes.map((q) => (
               <tr key={q.id} onClick={() => onOpen(q.id)} className="cursor-pointer hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 font-medium text-indigo-600">{q.quote_number}</td>
+                <td className="px-4 py-3 font-medium text-brand">{q.quote_number}</td>
                 <td className="px-4 py-3 text-gray-900">{q.legal_name}</td>
                 <td className="px-4 py-3 text-gray-700">
                   ${q.grand_total ? parseFloat(q.grand_total).toLocaleString() : '-'}

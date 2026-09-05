@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -91,7 +91,7 @@ export default function ApprovalsPage() {
                   onClick={() => router.push(`/approvals/${a.id}`)}
                   className="cursor-pointer hover:bg-gray-50 transition-colors"
                 >
-                  <td className="px-4 py-3 font-medium text-indigo-600">{a.quote_number}</td>
+                  <td className="px-4 py-3 font-medium text-brand">{a.quote_number}</td>
                   <td className="px-4 py-3 text-gray-900">{a.customer_name}</td>
                   <td className="px-4 py-3">
                     <RiskBadge risk={routeToRisk(a.route)} />

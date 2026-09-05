@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useRouter } from 'next/navigation';
 import { fulfillmentOrders, warehouseStock } from '@/lib/data';
@@ -29,7 +29,7 @@ export default function FulfillmentPage() {
       </Card>
 
       {/* Orders awaiting fulfillment */}
-      <h2 className="text-sm font-semibold text-indigo-600 mb-3">Orders Awaiting Fulfillment</h2>
+      <h2 className="text-sm font-semibold text-brand mb-3">Orders Awaiting Fulfillment</h2>
       <Card className="mb-4">
         <Table headers={['Order', 'Customer', 'Status', 'Warehouses']}>
           {fulfillmentOrders.map((order) => (
@@ -38,7 +38,7 @@ export default function FulfillmentPage() {
               onClick={() => router.push(`/fulfillment/${order.id}`)}
               clickable
             >
-              <Td className="font-medium text-indigo-600">{order.id}</Td>
+              <Td className="font-medium text-brand">{order.id}</Td>
               <Td>{order.customer}</Td>
               <Td>
                 <Badge variant={order.status === 'Split Pending' ? 'yellow' : 'red'}>{order.status}</Badge>

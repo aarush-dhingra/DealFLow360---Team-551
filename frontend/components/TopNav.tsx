@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useState, useRef, useEffect } from 'react';
 import { getUser, clearToken } from '@/lib/api';
 
 const navItems = [
@@ -25,6 +26,18 @@ export default function TopNav() {
     ? user.displayName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
     : 'JR';
   const displayName = user?.displayName ?? 'J. Rao';
+  const email = user?.email ?? '';
+
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   function logout() {
     clearToken();
@@ -36,7 +49,7 @@ export default function TopNav() {
       <div className="flex items-center h-14 px-4 gap-1">
         <Link href="/dashboard" className="mr-4 shrink-0 flex items-center gap-2">
           <Image src="/logo-256.png" alt="DealFlow360" width={28} height={28} className="rounded" priority />
-          <span className="font-semibold text-indigo-600 text-base">DealFlow360</span>
+          <span className="font-semibold text-base text-gray-900">DealFlow<span className="text-brand">360</span></span>
         </Link>
         <nav className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide">
           {navItems.map((item) => {
@@ -47,7 +60,7 @@ export default function TopNav() {
                 href={item.href}
                 className={`px-3 py-1.5 rounded text-sm font-medium whitespace-nowrap transition-colors ${
                   active
-                    ? 'bg-indigo-50 text-indigo-700'
+                    ? 'bg-brand-50 text-brand-dim'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`}
               >
@@ -56,17 +69,43 @@ export default function TopNav() {
             );
           })}
         </nav>
-        <div className="ml-auto flex items-center gap-3 shrink-0">
-          <span className="text-xs text-gray-500">{displayName}</span>
-          <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center justify-center">
-            {initials}
-          </div>
+
+        <div className="ml-auto shrink-0 relative" ref={ref}>
           <button
-            onClick={logout}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            onClick={() => setOpen((o) => !o)}
+            className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors"
           >
-            Logout
+            <div className="w-7 h-7 rounded-full bg-brand-50 text-brand-dim text-xs font-semibold flex items-center justify-center">
+              {initials}
+            </div>
+            <span className="text-sm font-medium text-gray-700">{displayName}</span>
+            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
+
+          {open && (
+            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl border border-gray-200 shadow-lg z-50 overflow-hidden">
+              <div className="flex flex-col items-center px-4 pt-5 pb-4 border-b border-gray-100">
+                <div className="w-12 h-12 rounded-full bg-brand-50 text-brand-dim text-base font-bold flex items-center justify-center mb-3">
+                  {initials}
+                </div>
+                <p className="text-sm font-semibold text-gray-900">{displayName}</p>
+                {email && <p className="text-xs text-gray-400 mt-0.5">{email}</p>}
+              </div>
+              <div className="p-1.5">
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Log out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

@@ -91,7 +91,7 @@ export default function DealHealthPage() {
             <Table headers={['Quote', 'Customer', 'Idle Days', 'Action']}>
               {stalled.map((deal) => (
                 <Tr key={deal.id}>
-                  <Td className="font-medium text-indigo-600">{deal.quote_number}</Td>
+                  <Td className="font-medium text-brand">{deal.quote_number}</Td>
                   <Td>{deal.customer_name}</Td>
                   <Td><Badge variant="yellow">{deal.inactivity_days} days idle</Badge></Td>
                   <Td>
@@ -117,7 +117,7 @@ export default function DealHealthPage() {
             <Table headers={['Quote', 'Customer', 'Blended Risk %', 'Route']}>
               {anomalies.map((a) => (
                 <Tr key={a.id}>
-                  <Td className="font-medium text-indigo-600">{a.quote_number}</Td>
+                  <Td className="font-medium text-brand">{a.quote_number}</Td>
                   <Td>{a.customer_name}</Td>
                   <Td><Badge variant="red">{parseFloat(a.blended_risk_percent).toFixed(1)}%</Badge></Td>
                   <Td className="text-gray-600">{a.route}</Td>
