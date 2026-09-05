@@ -28,3 +28,5 @@ export async function writeAuditAndOutbox(client, { aggregateType, aggregateId, 
     [aggregateType, aggregateId, eventType, { aggregateId, eventType, metadata }]
   );
 }
+
+export const withTransaction = inTransaction;
