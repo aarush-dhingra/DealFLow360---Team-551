@@ -1,6 +1,6 @@
 import express from 'express';
 import { apiRouter } from './routes.js';
-import { errorHandler } from './shared/middleware/errorHandler.js';
+import { errorHandler } from './shared/http/response.js';
 
 export function createApp() {
   const app = express();
