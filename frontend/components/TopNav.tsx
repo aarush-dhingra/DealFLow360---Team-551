@@ -8,24 +8,100 @@ import { getUser, clearToken } from '@/lib/api';
 
 const ALL_ROLES = ['sales_rep', 'sales_manager', 'finance_operations', 'admin'];
 
-const navItems = [
-  { label: 'Dashboard',        href: '/dashboard',          roles: ALL_ROLES },
-  { label: 'Quotations',       href: '/quotations',         roles: ['sales_rep', 'sales_manager', 'finance_operations', 'admin'] },
-  { label: 'Approvals',        href: '/approvals',          roles: ['sales_manager', 'admin'] },
-  { label: 'Fulfillment',      href: '/fulfillment',        roles: ['admin'] },
-  { label: 'Subscriptions',    href: '/subscriptions',      roles: ['sales_manager', 'admin'] },
-  { label: 'Invoices',         href: '/invoices',           roles: ['finance_operations', 'admin'] },
-  { label: 'Deal Health',      href: '/deal-health',        roles: ['sales_manager', 'admin'] },
-  { label: 'Reports',          href: '/reports',            roles: ['sales_manager', 'admin'] },
-  { label: 'Products',         href: '/products',           roles: ['sales_manager', 'admin'] },
-  { label: 'Users',            href: '/settings/users',     roles: ['admin'] },
-  { label: 'Tier Program',     href: '/settings/tier-program', roles: ['admin'] },
-  { label: 'Customers',        href: '/settings/customers', roles: ['admin'] },
-  { label: 'Fin: Approvals',   href: '/finance/approvals',  roles: ['finance_operations', 'admin'] },
-  { label: 'Fin: Fulfillment', href: '/finance/fulfillment',roles: ['finance_operations', 'admin'] },
-  { label: 'Fin: Payments',    href: '/finance/payments',   roles: ['finance_operations', 'admin'] },
-  { label: 'Fin: Credits',     href: '/finance/credit-notes',roles: ['finance_operations', 'admin'] },
+// Flat nav items (never grouped into dropdowns)
+const flatNavItems = [
+  { label: 'Dashboard',     href: '/dashboard',             roles: ALL_ROLES },
+  { label: 'Quotations',    href: '/quotations',            roles: ['sales_rep', 'sales_manager', 'finance_operations', 'admin'] },
+  { label: 'Approvals',     href: '/approvals',             roles: ['sales_manager', 'admin'] },
+  { label: 'Fulfillment',   href: '/fulfillment',           roles: [] },
+  { label: 'Subscriptions', href: '/subscriptions',         roles: ['sales_manager'] },
+  { label: 'Invoices',      href: '/invoices',              roles: ['finance_operations'] },
+  { label: 'Deal Health',   href: '/deal-health',           roles: ['sales_manager'] },
+  { label: 'Reports',       href: '/reports',               roles: ['sales_manager'] },
+  { label: 'Products',      href: '/products',              roles: ['sales_manager'] },
+  { label: 'Fin: Approvals',   href: '/finance/approvals',     roles: ['finance_operations'] },
+  { label: 'Fin: Fulfillment', href: '/finance/fulfillment',   roles: ['finance_operations'] },
+  { label: 'Fin: Payments',    href: '/finance/payments',       roles: ['finance_operations'] },
+  { label: 'Fin: Credits',     href: '/finance/credit-notes',  roles: ['finance_operations'] },
 ];
+
+// Admin-only grouped dropdowns
+const adminGroups = [
+  {
+    label: 'Operations ▾',
+    items: [
+      { label: 'Fulfillment',   href: '/fulfillment' },
+      { label: 'Subscriptions', href: '/subscriptions' },
+      { label: 'Deal Health',   href: '/deal-health' },
+      { label: 'Reports',       href: '/reports' },
+    ],
+  },
+  {
+    label: 'Finance ▾',
+    items: [
+      { label: 'Invoices',         href: '/invoices' },
+      { label: 'Fin: Approvals',   href: '/finance/approvals' },
+      { label: 'Fin: Fulfillment', href: '/finance/fulfillment' },
+      { label: 'Fin: Payments',    href: '/finance/payments' },
+      { label: 'Fin: Credits',     href: '/finance/credit-notes' },
+    ],
+  },
+  {
+    label: 'Config ▾',
+    items: [
+      { label: 'Products',     href: '/products' },
+      { label: 'Users',        href: '/settings/users' },
+      { label: 'Tier Program', href: '/settings/tier-program' },
+      { label: 'Customers',    href: '/settings/customers' },
+    ],
+  },
+];
+
+function NavDropdown({ label, items, pathname }: { label: string; items: { label: string; href: string }[]; pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const isActive = items.some((i) => pathname === i.href || pathname.startsWith(i.href + '/'));
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={`px-3 py-1.5 rounded text-sm font-medium whitespace-nowrap transition-colors ${
+          isActive ? 'bg-brand-50 text-brand-dim' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        }`}
+      >
+        {label}
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 w-44 bg-white rounded-xl border border-gray-200 shadow-lg z-50 overflow-hidden py-1">
+          {items.map((item) => {
+            const active = pathname === item.href || pathname.startsWith(item.href + '/');
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className={`block px-4 py-2 text-sm transition-colors ${
+                  active ? 'bg-brand-50 text-brand-dim font-medium' : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TopNav() {
   const pathname = usePathname();
@@ -64,11 +140,11 @@ export default function TopNav() {
     router.push('/');
   }
 
-  const visibleNav = userRoles.length === 0
-    ? navItems
-    : navItems.filter((item) =>
-        item.roles.some((r) => userRoles.includes(r))
-      );
+  const isAdmin = userRoles.includes('admin');
+
+  const visibleFlat = userRoles.length === 0
+    ? flatNavItems
+    : flatNavItems.filter((item) => item.roles.some((r) => userRoles.includes(r)));
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -77,23 +153,25 @@ export default function TopNav() {
           <Image src="/logo-256.png" alt="DealFlow360" width={28} height={28} className="rounded" priority />
           <span className="font-semibold text-base text-gray-900">DealFlow<span className="text-brand">360</span></span>
         </Link>
-        <nav className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide">
-          {visibleNav.map((item) => {
+
+        <nav className="flex items-center gap-0.5">
+          {visibleFlat.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + '/');
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={`px-3 py-1.5 rounded text-sm font-medium whitespace-nowrap transition-colors ${
-                  active
-                    ? 'bg-brand-50 text-brand-dim'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  active ? 'bg-brand-50 text-brand-dim' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`}
               >
                 {item.label}
               </Link>
             );
           })}
+          {isAdmin && adminGroups.map((group) => (
+            <NavDropdown key={group.label} label={group.label} items={group.items} pathname={pathname} />
+          ))}
         </nav>
 
         <div className="ml-auto shrink-0 relative" ref={ref}>

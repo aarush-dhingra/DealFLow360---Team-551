@@ -125,7 +125,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="flex gap-3 mb-6">
-        {(isSalesRep || isAdmin) && (
+        {isSalesRep && (
           <Link
             href="/quotations/new"
             className="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dim transition-colors"
@@ -133,7 +133,7 @@ export default function DashboardPage() {
             + New Quotation
           </Link>
         )}
-        {isManager && (
+        {isManager && !isAdmin && (
           <Link
             href="/approvals"
             className="px-4 py-2 bg-white text-gray-700 border border-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
@@ -158,6 +158,27 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+
+      {isAdmin && (
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Configuration</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Products',     href: '/products',              sub: 'Catalog & pricing' },
+              { label: 'Tier Program', href: '/settings/tier-program', sub: 'Discount tiers' },
+              { label: 'Users',        href: '/settings/users',        sub: 'Access & roles' },
+              { label: 'Customers',    href: '/settings/customers',    sub: 'Accounts & contacts' },
+            ].map(({ label, href, sub }) => (
+              <Link key={href} href={href}>
+                <Card className="p-4 hover:border-brand hover:shadow-md transition-all cursor-pointer">
+                  <p className="text-sm font-semibold text-gray-800">{label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {isManager && (
         <Card className="p-5">
