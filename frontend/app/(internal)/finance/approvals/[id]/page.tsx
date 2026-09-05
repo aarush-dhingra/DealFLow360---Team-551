@@ -42,7 +42,8 @@ export default function FinanceApprovalDetailPage() {
   }, [id]);
 
   async function decide(action: 'approve' | 'reject' | 'return_for_revision') {
-    if (!reason.trim() || !detail) return;
+    if (!detail) return;
+    if (action !== 'approve' && !reason.trim()) return;
     setActing(true);
     try {
       await api.post(
@@ -170,7 +171,7 @@ export default function FinanceApprovalDetailPage() {
           {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
           <div className="flex gap-3 flex-wrap">
-            <Button variant="primary" onClick={() => decide('approve')} disabled={acting || !reason.trim()}>Approve</Button>
+            <Button variant="primary" onClick={() => decide('approve')} disabled={acting}>Approve</Button>
             <Button variant="warning" onClick={() => decide('return_for_revision')} disabled={acting || !reason.trim()}>Return for Revision</Button>
             <Button variant="danger" onClick={() => decide('reject')} disabled={acting || !reason.trim()}>Reject</Button>
           </div>
