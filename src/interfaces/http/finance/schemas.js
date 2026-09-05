@@ -68,3 +68,13 @@ export const allocateBody = z
       });
     }
   });
+
+export const invoiceParams = z.object({
+  invoiceId: z.string().uuid()
+});
+
+export const applyPaymentBody = z.object({
+  amount: moneyString.refine((v) => Number(v) > 0, 'amount must be greater than zero'),
+  method: z.string().trim().min(1),
+  externalReference: z.string().trim().max(200).optional()
+});

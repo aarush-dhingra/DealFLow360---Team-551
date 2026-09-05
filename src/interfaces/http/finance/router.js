@@ -14,6 +14,7 @@ import {
   allocateFulfillmentController,
   consolidateBackordersController
 } from './fulfillment.controller.js';
+import { applyPaymentController, voidInvoiceController } from './payments.controller.js';
 
 export const financeRouter = Router();
 
@@ -40,6 +41,19 @@ financeRouter.post(
   '/fulfillment/quotations/:quotationId/consolidate-backorders',
   requireFinance,
   consolidateBackordersController
+);
+
+// Finance records payments and voids unpaid invoices.
+financeRouter.post(
+  '/invoices/:invoiceId/payments',
+  requireFinance,
+  applyPaymentController
+);
+
+financeRouter.post(
+  '/invoices/:invoiceId/void',
+  requireFinance,
+  voidInvoiceController
 );
 
 // Keep the error envelope local to finance routes.
