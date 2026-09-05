@@ -5,6 +5,7 @@ import { quoteRouter } from './interfaces/http/sales-rep/sales-rep.routes.js';
 import { managerRouter } from './interfaces/http/manager/routes.js';
 import { financeRouter } from './interfaces/http/finance/router.js';
 import { customerPortalRouter } from './interfaces/http/customer-portal/routes.js';
+import { negotiationRouter } from './interfaces/http/negotiations/negotiation.routes.js';
 
 export const apiRouter = Router();
 
@@ -18,3 +19,4 @@ apiRouter.use('/sales-rep/quotations', quoteRouter);
 apiRouter.use('/manager', managerRouter);
 apiRouter.use('/finance', financeRouter);
 apiRouter.use('/portal', customerPortalRouter);
+apiRouter.use('/negotiations', negotiationRouter);

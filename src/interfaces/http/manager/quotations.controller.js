@@ -5,13 +5,20 @@ import { pool } from '../../../infrastructure/database/pool.js';
 export async function listQuotations(req, res, next) {
   try {
     const { status, owner_id, customer_id, limit, offset } = req.query;
-    const quotes = await quotationsSvc.listQuotations({
+    const all = await quotationsSvc.listQuotations({
       status,
       ownerId: owner_id,
       customerId: customer_id,
       limit: limit ? Number(limit) : 50,
       offset: offset ? Number(offset) : 0
     });
+    let quotes = all;
+    if (!req.user.roles.includes('admin')) {
+      const role = req.user.roles.includes('sales_manager') ? 'sales_manager' : 'finance_operations';
+      const { rows } = await pool.query(`SELECT DISTINCT quotation_id FROM negotiation_cases WHERE owner_role=$1 AND status='open' UNION SELECT DISTINCT quotation_id FROM approval_instances WHERE required_role=$1 AND status='pending'`, [role]);
+      const ids = new Set(rows.map((row) => row.quotation_id));
+      quotes = all.filter((quote) => ids.has(quote.id));
+    }
     res.json({ quotations: quotes, count: quotes.length });
   } catch (err) { next(err); }
 }

@@ -108,11 +108,11 @@ export async function getApprovalWithFullDetail(id) {
   const { rows: quoteRows } = await pool.query(
     `SELECT
        q.id, q.quote_number, q.status, q.current_version_number, q.lock_version,
-       c.legal_name AS customer_name, ct.code AS customer_tier,
+       c.legal_name AS customer_name, COALESCE(ct.code,'none') AS customer_tier,
        u.display_name AS rep_name
      FROM quotations q
      JOIN customers c ON c.id = q.customer_id
-     JOIN customer_tiers ct ON ct.id = c.tier_id
+     LEFT JOIN customer_tiers ct ON ct.id = c.tier_id
      JOIN users u ON u.id = q.owner_user_id
      WHERE q.id = $1`,
     [approval.quotation_id]
