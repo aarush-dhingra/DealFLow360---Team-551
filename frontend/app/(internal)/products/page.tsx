@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { products } from '@/lib/data';
-import { PageHeader, StatCard, Badge, InfoBanner, Button, Card, Table, Tr, Td } from '@/components/ui';
+import { PageHeader, StatCard, Badge, Button, Card, Table, Tr, Td } from '@/components/ui';
 
 export default function ProductsPage() {
   const router = useRouter();
@@ -39,7 +39,6 @@ export default function ProductsPage() {
         </Table>
       </Card>
 
-      <InfoBanner>Click a product row to open general info, variants and tier/currency price lists.</InfoBanner>
     </div>
   );
 }

@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useRoleGuard } from '@/lib/useRoleGuard';
 import { routeToRisk, type BackendApprovalRoute } from '@/lib/data';
-import { PageHeader, RiskBadge, Badge, FilterChip, Card } from '@/components/ui';
+import { PageHeader, RiskBadge, Badge, Card } from '@/components/ui';
 
 interface ApprovalRow {
   id: string;
@@ -40,7 +41,7 @@ export default function ApprovalsPage() {
   useEffect(() => {
     api.get<{ approvals: ApprovalRow[]; count: number }>('/manager/approvals')
       .then((res) => setApprovals(res.approvals))
-      .catch((err) => setError(err.message))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -58,11 +59,17 @@ export default function ApprovalsPage() {
     <div>
       <PageHeader title="Approvals" subtitle="Every quotation that needed, needs, or has gone through discount approval" />
 
-      <div className="flex gap-2 mb-5">
-        <FilterChip label="Pending"  count={pending.length}  active={filter === 'pending'}  onClick={() => setFilter('pending')}  color="yellow" />
-        <FilterChip label="Returned" count={returned.length} active={filter === 'returned'} onClick={() => setFilter('returned')} color="red" />
-        <FilterChip label="Approved" count={approved.length} active={filter === 'approved'} onClick={() => setFilter('approved')} color="green" />
-        <FilterChip label="All"      active={filter === 'all'}      onClick={() => setFilter('all')} />
+      <div className="flex items-center gap-3 mb-5">
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as Filter)}
+          className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-brand"
+        >
+          <option value="all">All ({approvals.length})</option>
+          <option value="pending">Pending ({pending.length})</option>
+          <option value="returned">Returned ({returned.length})</option>
+          <option value="approved">Approved ({approved.length})</option>
+        </select>
       </div>
 
       {error && (

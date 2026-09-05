@@ -6,29 +6,46 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { getUser, clearToken } from '@/lib/api';
 
+const ALL_ROLES = ['sales_rep', 'sales_manager', 'finance_operations', 'admin'];
+
 const navItems = [
-  { label: 'Dashboard',    href: '/dashboard' },
-  { label: 'Quotations',   href: '/quotations' },
-  { label: 'Approvals',    href: '/approvals' },
-  { label: 'Fulfillment',  href: '/fulfillment' },
-  { label: 'Subscriptions',href: '/subscriptions' },
-  { label: 'Invoices',     href: '/invoices' },
-  { label: 'Deal Health',  href: '/deal-health' },
-  { label: 'Reports',      href: '/reports' },
-  { label: 'Products',     href: '/products' },
+  { label: 'Dashboard',        href: '/dashboard',          roles: ALL_ROLES },
+  { label: 'Quotations',       href: '/quotations',         roles: ['sales_rep', 'sales_manager', 'admin'] },
+  { label: 'Approvals',        href: '/approvals',          roles: ['sales_manager', 'admin'] },
+  { label: 'Fulfillment',      href: '/fulfillment',        roles: ['sales_manager', 'admin'] },
+  { label: 'Subscriptions',    href: '/subscriptions',      roles: ['sales_manager', 'admin'] },
+  { label: 'Invoices',         href: '/invoices',           roles: ['finance_operations', 'admin'] },
+  { label: 'Deal Health',      href: '/deal-health',        roles: ['sales_manager', 'admin'] },
+  { label: 'Reports',          href: '/reports',            roles: ['sales_manager', 'admin'] },
+  { label: 'Products',         href: '/products',           roles: ['sales_manager', 'admin'] },
+  { label: 'Fin: Approvals',   href: '/finance/approvals',  roles: ['finance_operations', 'admin'] },
+  { label: 'Fin: Fulfillment', href: '/finance/fulfillment',roles: ['finance_operations', 'admin'] },
+  { label: 'Fin: Payments',    href: '/finance/payments',   roles: ['finance_operations', 'admin'] },
+  { label: 'Fin: Credits',     href: '/finance/credit-notes',roles: ['finance_operations', 'admin'] },
 ];
 
 export default function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const user = getUser();
-  const initials = user?.displayName
-    ? user.displayName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-    : 'JR';
-  const displayName = user?.displayName ?? 'J. Rao';
-  const email = user?.email ?? '';
 
   const [open, setOpen] = useState(false);
+  const [initials, setInitials] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    const user = getUser();
+    setDisplayName(user?.displayName ?? '');
+    setEmail(user?.email ?? '');
+    setUserRoles(user?.roles ?? []);
+    setInitials(
+      user?.displayName
+        ? user.displayName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+        : ''
+    );
+  }, []);
+
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,6 +61,12 @@ export default function TopNav() {
     router.push('/');
   }
 
+  const visibleNav = userRoles.length === 0
+    ? navItems
+    : navItems.filter((item) =>
+        item.roles.some((r) => userRoles.includes(r))
+      );
+
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="flex items-center h-14 px-4 gap-1">
@@ -52,7 +75,7 @@ export default function TopNav() {
           <span className="font-semibold text-base text-gray-900">DealFlow<span className="text-brand">360</span></span>
         </Link>
         <nav className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide">
-          {navItems.map((item) => {
+          {visibleNav.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + '/');
             return (
               <Link
