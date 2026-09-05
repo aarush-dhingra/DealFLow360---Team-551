@@ -32,3 +32,39 @@ export function parse(schema, value) {
   }
   return result.data;
 }
+
+export const allocateParams = z.object({
+  quotationId: z.string().uuid()
+});
+
+const moneyString = z
+  .string()
+  .regex(/^\d+(\.\d+)?$/, 'quantity must be a decimal string');
+
+export const manualAllocationItem = z.object({
+  quotationLineId: z.string().uuid(),
+  warehouseId: z.string().uuid(),
+  quantity: moneyString
+});
+
+export const allocateBody = z
+  .object({
+    mode: z.enum(['suggested', 'manual']),
+    allocations: z.array(manualAllocationItem).optional()
+  })
+  .superRefine((data, ctx) => {
+    if (data.mode === 'manual' && (!data.allocations || data.allocations.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['allocations'],
+        message: 'allocations[] is required when mode is manual'
+      });
+    }
+    if (data.mode === 'suggested' && data.allocations) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['allocations'],
+        message: 'allocations[] is not allowed when mode is suggested'
+      });
+    }
+  });
