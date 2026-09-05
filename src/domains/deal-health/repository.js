@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import { pool } from '../../infrastructure/database/pool.js';
+import { computeBand } from './policy.js';
 
 // ─── Deal health policy ───────────────────────────────────────────────────────
 
@@ -46,6 +47,7 @@ export async function assessAndStore(quotationId, policy) {
     const score = capped(new Decimal(turns).mul(policy.turn_points), policy.turn_points_cap)
       .plus(capped(new Decimal(ageDays).mul(policy.quote_age_day_points), policy.quote_age_points_cap))
       .plus(capped(new Decimal(inactDays).mul(policy.inactivity_day_points), policy.inactivity_points_cap));
+    const band = computeBand(score, policy);
 
     const { rows: assessmentRows } = await client.query(
       `INSERT INTO deal_health_assessments
@@ -58,7 +60,7 @@ export async function assessAndStore(quotationId, policy) {
         ageDays,
         inactDays,
         score.toFixed(4),
-        'normal',
+        band,
         JSON.stringify(policy),
       ]
     );
@@ -174,11 +176,6 @@ export async function nudgeRep(quotationId, actorUserId) {
       `INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
        VALUES ('quotation', $1, 'rep_nudge_requested', $2)`,
       [quotationId, JSON.stringify({ quotation_id: quotationId, nudged_by: actorUserId })]
-    );
-
-    await client.query(
-      `UPDATE quotations SET last_activity_at = now() WHERE id = $1`,
-      [quotationId]
     );
 
     await client.query('COMMIT');
