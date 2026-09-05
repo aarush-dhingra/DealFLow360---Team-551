@@ -123,7 +123,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        {tab === 'customerSignup' && <p className="mt-3 text-center text-xs text-gray-400">Your company administrator must have added this email as a customer contact.</p>}
+        {tab === 'customerSignup' && <p className="mt-3 text-center text-xs text-gray-400">Create an account to view and manage your quotes.</p>}
 
         <p className="mt-4 text-center text-xs text-gray-400">
           After login, internal users land on the Sales Dashboard.

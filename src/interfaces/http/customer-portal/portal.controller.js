@@ -1,6 +1,7 @@
 import { validate, validateQuery } from '../../../shared/http/validate.js';
 import { ok, created } from '../../../shared/http/response.js';
 import { NotFoundError } from '../../../shared/http/errors.js';
+import { pool } from '../../../infrastructure/database/pool.js';
 import {
   counterOfferSchema,
   acceptQuoteSchema,
@@ -93,5 +94,43 @@ export async function submitCounterOffer(req, res, next) {
       }
     );
     created(res, result);
+  } catch (err) { next(err); }
+}
+
+export async function createQuoteRequest(req, res, next) {
+  try {
+    const message = req.body?.message?.trim();
+    if (!message) return res.status(400).json({ error: 'Message is required' });
+
+    const { rows: contacts } = await pool.query(
+      'SELECT id, customer_id FROM customer_contacts WHERE email = $1 LIMIT 1',
+      [req.user.email]
+    );
+    const contact = contacts[0];
+    if (!contact) throw new NotFoundError('Customer contact');
+
+    const { rows } = await pool.query(
+      `INSERT INTO quote_requests (customer_id, contact_id, message) VALUES ($1, $2, $3)
+       RETURNING id, message, status, created_at`,
+      [contact.customer_id, contact.id, message]
+    );
+    created(res, { request: rows[0] });
+  } catch (err) { next(err); }
+}
+
+export async function listMyQuoteRequests(req, res, next) {
+  try {
+    const { rows: contacts } = await pool.query(
+      'SELECT customer_id FROM customer_contacts WHERE email = $1 LIMIT 1',
+      [req.user.email]
+    );
+    if (!contacts[0]) return ok(res, { requests: [] });
+
+    const { rows } = await pool.query(
+      `SELECT id, message, status, created_at FROM quote_requests
+       WHERE customer_id = $1 ORDER BY created_at DESC`,
+      [contacts[0].customer_id]
+    );
+    ok(res, { requests: rows });
   } catch (err) { next(err); }
 }

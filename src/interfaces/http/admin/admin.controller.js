@@ -43,7 +43,7 @@ adminController.get('/overview', async (_request, response, next) => {
 // Internal accounts are provisioned by an administrator and must replace the temporary password at first sign-in.
 adminController.get('/users', async (_request, response, next) => {
   try {
-    const { rows } = await pool.query(`SELECT u.id, u.email, u.display_name, u.is_active, u.must_change_password, u.created_at, array_agg(ur.role) AS roles
+    const { rows } = await pool.query(`SELECT u.id, u.email, u.display_name, u.is_active, u.must_change_password, u.created_at, array_agg(ur.role::text) AS roles
       FROM users u JOIN user_roles ur ON ur.user_id = u.id
       WHERE ur.role <> 'customer_portal' GROUP BY u.id ORDER BY u.created_at DESC`);
     respond(response, rows);

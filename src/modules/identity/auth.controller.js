@@ -54,23 +54,47 @@ export async function changePassword(request, response, next) {
 export async function customerSignup(request, response, next) {
   try {
     const { email, password, displayName } = request.validated.body;
-    const { rows: contacts } = await pool.query(
-      'SELECT id FROM customer_contacts WHERE email = $1 LIMIT 1', [email]
-    );
-    if (!contacts[0]) {
-      throw new AppError(403, 'CUSTOMER_NOT_INVITED', 'Ask your DealFlow360 administrator to add this email as a customer contact first.');
-    }
     const passwordHash = await hashPassword(password);
-    const { rows } = await pool.query(
-      `INSERT INTO users (email, password_hash, display_name, must_change_password)
-       VALUES ($1, $2, $3, FALSE)
-       ON CONFLICT (email) DO NOTHING
-       RETURNING id, email, display_name`,
-      [email, passwordHash, displayName]
-    );
-    const user = rows[0];
-    if (!user) throw new AppError(409, 'ACCOUNT_EXISTS', 'An account already exists for this email. Please sign in.');
-    await pool.query('INSERT INTO user_roles (user_id, role) VALUES ($1, $2)', [user.id, 'customer_portal']);
+
+    const client = await pool.connect();
+    let user;
+    try {
+      await client.query('BEGIN');
+
+      const { rows } = await client.query(
+        `INSERT INTO users (email, password_hash, display_name, must_change_password)
+         VALUES ($1, $2, $3, FALSE)
+         ON CONFLICT (email) DO NOTHING
+         RETURNING id, email, display_name`,
+        [email, passwordHash, displayName]
+      );
+      user = rows[0];
+      if (!user) throw new AppError(409, 'ACCOUNT_EXISTS', 'An account already exists for this email. Please sign in.');
+
+      await client.query('INSERT INTO user_roles (user_id, role) VALUES ($1, $2)', [user.id, 'customer_portal']);
+
+      // Auto-create a customer profile so the portal resolves correctly
+      const { rows: tierRows } = await client.query(`SELECT id FROM customer_tiers WHERE code = 'bronze' LIMIT 1`);
+      const tierId = tierRows[0]?.id;
+      if (tierId) {
+        const { rows: custRows } = await client.query(
+          `INSERT INTO customers (legal_name, tier_id) VALUES ($1, $2) RETURNING id`,
+          [displayName, tierId]
+        );
+        await client.query(
+          `INSERT INTO customer_contacts (customer_id, email, display_name) VALUES ($1, $2, $3)`,
+          [custRows[0].id, email, displayName]
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + env.SESSION_TTL_HOURS * 60 * 60 * 1000);
     await pool.query('INSERT INTO auth_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)', [user.id, tokenHash(token), expiresAt]);

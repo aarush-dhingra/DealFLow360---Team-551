@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { PageHeader, StatCard, Badge, Button, Card } from '@/components/ui';

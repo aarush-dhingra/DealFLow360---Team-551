@@ -63,6 +63,10 @@ managerRouter.get('/quotations/:id/audit', requireAuth, requireRole(...reviewers
 
 managerRouter.get('/quotations/:quotationId/risk', requireAuth, requireRole(...internal), quotationController.getQuotationRisk);
 
+// ─── Quote Requests (customer-initiated) ──────────────────────────────────────
+
+managerRouter.get('/quote-requests', requireAuth, requireRole(...reviewers), quotationController.listQuoteRequests);
+
 // ─── Approvals ────────────────────────────────────────────────────────────────
 
 managerRouter.get('/approvals', requireAuth, requireRole(...reviewers), approvalController.listApprovals);
