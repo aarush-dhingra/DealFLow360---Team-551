@@ -1,0 +1,50 @@
+// API client - proxied through Next.js rewrites to http://localhost:3001
+const BASE = '/api/v1';
+
+export function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try { return localStorage.getItem('df360_token'); } catch { return null; }
+}
+export function setToken(token: string, user: object): void {
+  localStorage.setItem('df360_token', token);
+  localStorage.setItem('df360_user', JSON.stringify(user));
+}
+export function clearToken(): void {
+  localStorage.removeItem('df360_token');
+  localStorage.removeItem('df360_user');
+}
+export function getUser(): { id: string; email: string; displayName: string; roles: string[] } | null {
+  try {
+    const raw = localStorage.getItem('df360_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const res = await fetch(`${BASE}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init.headers ?? {}),
+    },
+  });
+  if (res.status === 401) {
+    clearToken();
+    if (typeof window !== 'undefined') window.location.href = '/';
+    throw new Error('Session expired. Please log in again.');
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? body.error ?? `Request failed (${res.status})`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export const api = {
+  get:   <T>(path: string)              => request<T>(path),
+  post:  <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }),
+  put:   <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }),
+  patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+};
