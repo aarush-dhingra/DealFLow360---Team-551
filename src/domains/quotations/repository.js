@@ -50,7 +50,7 @@ export async function getQuotationById(id) {
        u.id AS owner_id, u.display_name AS owner_name
      FROM quotations q
      JOIN customers c ON c.id = q.customer_id
-     JOIN customer_tiers ct ON ct.id = c.tier_id
+     LEFT JOIN customer_tiers ct ON ct.id = c.tier_id
      JOIN users u ON u.id = q.owner_user_id
      WHERE q.id = $1`,
     [id]

@@ -43,9 +43,9 @@ try {
 
   for (const [code, name, discount] of [['gold', 'Gold', 15], ['silver', 'Silver', 10], ['bronze', 'Bronze', 5]]) {
     await client.query(
-      `INSERT INTO customer_tiers (code, display_name, entitlement_discount_percent)
-       VALUES ($1, $2, $3) ON CONFLICT (code) DO NOTHING`,
-      [code, name, discount]
+      `INSERT INTO customer_tiers (code, display_name, entitlement_discount_percent, qualification_spend, qualification_order_count)
+       VALUES ($1, $2, $3, $4, $5) ON CONFLICT (code) DO UPDATE SET entitlement_discount_percent=EXCLUDED.entitlement_discount_percent, qualification_spend=EXCLUDED.qualification_spend, qualification_order_count=EXCLUDED.qualification_order_count`,
+      [code, name, discount, code === 'bronze' ? 10000 : code === 'silver' ? 50000 : 150000, code === 'bronze' ? 3 : code === 'silver' ? 10 : 25]
     );
   }
   for (const [code, name, discount] of [['hardware', 'Hardware', 15], ['software', 'Software', 10]]) {

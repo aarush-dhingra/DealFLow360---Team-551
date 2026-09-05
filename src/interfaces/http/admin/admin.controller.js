@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { pool } from '../../../infrastructure/database/pool.js';
 import { inTransaction, writeAuditAndOutbox } from '../../../infrastructure/database/transaction.js';
 import { AppError, validate } from '../../../shared/http.js';
-import { approvalPolicySchema, categorySchema, contactSchema, customerSchema, healthPolicySchema, idParams, inventoryAdjustmentSchema, planSchema, priceListItemSchema, priceListSchema, productSchema, tierSchema, upsellRuleSchema, variantSchema, warehouseSchema } from './admin.schemas.js';
+import { approvalPolicySchema, categorySchema, contactSchema, customerSchema, healthPolicySchema, idParams, internalUserSchema, inventoryAdjustmentSchema, planSchema, priceListItemSchema, priceListSchema, productSchema, resetPasswordSchema, tierOverrideSchema, tierSchema, upsellRuleSchema, variantSchema, warehouseSchema } from './admin.schemas.js';
+import { hashPassword } from '../../../modules/identity/password.js';
 
 export const adminController = Router();
 
@@ -39,10 +40,49 @@ adminController.get('/overview', async (_request, response, next) => {
   } catch (error) { next(error); }
 });
 
+// Internal accounts are provisioned by an administrator and must replace the temporary password at first sign-in.
+adminController.get('/users', async (_request, response, next) => {
+  try {
+    const { rows } = await pool.query(`SELECT u.id, u.email, u.display_name, u.is_active, u.must_change_password, u.created_at, array_agg(ur.role) AS roles
+      FROM users u JOIN user_roles ur ON ur.user_id = u.id
+      WHERE ur.role <> 'customer_portal' GROUP BY u.id ORDER BY u.created_at DESC`);
+    respond(response, rows);
+  } catch (error) { next(error); }
+});
+adminController.post('/users', validate(internalUserSchema), async (request, response, next) => {
+  try {
+    const result = await inTransaction(async (client) => {
+      const input = request.validated.body;
+      const passwordHash = await hashPassword(input.password);
+      const { rows } = await client.query(`INSERT INTO users (email, password_hash, display_name, must_change_password)
+        VALUES ($1, $2, $3, TRUE) RETURNING id, email, display_name, must_change_password, is_active, created_at`, [input.email, passwordHash, input.displayName]);
+      await client.query('INSERT INTO user_roles (user_id, role) VALUES ($1, $2)', [rows[0].id, input.role]);
+      const account = { ...rows[0], roles: [input.role] };
+      await writeAuditAndOutbox(client, { aggregateType: 'user', aggregateId: account.id, eventType: 'internal_user.provisioned', actorUserId: actor(request), afterState: { ...account, password_hash: undefined } });
+      return account;
+    });
+    respond(response, result, 201);
+  } catch (error) { next(error); }
+});
+adminController.post('/users/:id/reset-password', validate(idParams, 'params'), validate(resetPasswordSchema), async (request, response, next) => {
+  try {
+    const result = await inTransaction(async (client) => {
+      const target = await getRequired(client, 'users', id(request));
+      const passwordHash = await hashPassword(request.validated.body.password);
+      await client.query('UPDATE users SET password_hash = $1, must_change_password = TRUE, updated_at = now() WHERE id = $2', [passwordHash, target.id]);
+      await client.query('UPDATE auth_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [target.id]);
+      await writeAuditAndOutbox(client, { aggregateType: 'user', aggregateId: target.id, eventType: 'internal_user.password_reset', actorUserId: actor(request), beforeState: { must_change_password: target.must_change_password }, afterState: { must_change_password: true } });
+      return { id: target.id, mustChangePassword: true };
+    });
+    respond(response, result);
+  } catch (error) { next(error); }
+});
+
 // Customers are master data: changing a customer tier is audited, and quote revisions use a policy snapshot.
-adminController.get('/customers', async (_request,response,next)=>{try{const {rows}=await pool.query(`SELECT c.*,ct.code AS tier_code,ct.display_name AS tier_name,count(cc.id)::int AS contact_count FROM customers c JOIN customer_tiers ct ON ct.id=c.tier_id LEFT JOIN customer_contacts cc ON cc.customer_id=c.id GROUP BY c.id,ct.code,ct.display_name ORDER BY c.legal_name`);respond(response,rows);}catch(error){next(error);}});
-adminController.post('/customers', validate(customerSchema), async(request,response,next)=>{try{const result=await inTransaction(async(client)=>{const x=request.validated.body;await getRequired(client,'customer_tiers',x.tierId);const {rows}=await client.query('INSERT INTO customers (legal_name,tier_id,currency_code) VALUES ($1,$2,$3) RETURNING *',[x.legalName,x.tierId,x.currencyCode]);await writeAuditAndOutbox(client,{aggregateType:'customer',aggregateId:rows[0].id,eventType:'customer.created',actorUserId:actor(request),afterState:rows[0]});return rows[0];});respond(response,result,201);}catch(error){next(error);}});
-adminController.put('/customers/:id', validate(idParams,'params'), validate(customerSchema), async(request,response,next)=>{try{const result=await inTransaction(async(client)=>{const before=await getRequired(client,'customers',id(request));const x=request.validated.body;await getRequired(client,'customer_tiers',x.tierId);const {rows}=await client.query('UPDATE customers SET legal_name=$1,tier_id=$2,currency_code=$3,updated_at=now() WHERE id=$4 RETURNING *',[x.legalName,x.tierId,x.currencyCode,before.id]);await writeAuditAndOutbox(client,{aggregateType:'customer',aggregateId:before.id,eventType:'customer.updated',actorUserId:actor(request),beforeState:before,afterState:rows[0]});return rows[0];});respond(response,result);}catch(error){next(error);}});
+adminController.get('/customers', async (_request,response,next)=>{try{const {rows}=await pool.query(`SELECT c.*,ct.code AS tier_code,ct.display_name AS tier_name,count(cc.id)::int AS contact_count FROM customers c LEFT JOIN customer_tiers ct ON ct.id=c.tier_id LEFT JOIN customer_contacts cc ON cc.customer_id=c.id GROUP BY c.id,ct.code,ct.display_name ORDER BY c.legal_name`);respond(response,rows);}catch(error){next(error);}});
+adminController.post('/customers', validate(customerSchema), async(request,response,next)=>{try{const result=await inTransaction(async(client)=>{const x=request.validated.body;if(x.tierId)await getRequired(client,'customer_tiers',x.tierId);const {rows}=await client.query('INSERT INTO customers (legal_name,tier_id,currency_code,tier_assignment_source) VALUES ($1,$2,$3,$4) RETURNING *',[x.legalName,x.tierId??null,x.currencyCode,x.tierId?'admin_override':'automatic']);await writeAuditAndOutbox(client,{aggregateType:'customer',aggregateId:rows[0].id,eventType:'customer.created',actorUserId:actor(request),afterState:rows[0]});return rows[0];});respond(response,result,201);}catch(error){next(error);}});
+adminController.put('/customers/:id', validate(idParams,'params'), validate(customerSchema), async(request,response,next)=>{try{const result=await inTransaction(async(client)=>{const before=await getRequired(client,'customers',id(request));const x=request.validated.body;if(x.tierId)await getRequired(client,'customer_tiers',x.tierId);const {rows}=await client.query('UPDATE customers SET legal_name=$1,currency_code=$2,updated_at=now() WHERE id=$3 RETURNING *',[x.legalName,x.currencyCode,before.id]);await writeAuditAndOutbox(client,{aggregateType:'customer',aggregateId:before.id,eventType:'customer.updated',actorUserId:actor(request),beforeState:before,afterState:rows[0]});return rows[0];});respond(response,result);}catch(error){next(error);}});
+adminController.put('/customers/:id/tier', validate(idParams,'params'), validate(tierOverrideSchema), async(request,response,next)=>{try{const result=await inTransaction(async(client)=>{const before=await getRequired(client,'customers',id(request));const x=request.validated.body;if(x.tierId)await getRequired(client,'customer_tiers',x.tierId);await client.query(`UPDATE customers SET tier_id=$1,tier_assignment_source='admin_override',tier_assigned_at=now(),tier_override_reason=$2,updated_at=now() WHERE id=$3`,[x.tierId,x.reason,before.id]);await client.query(`INSERT INTO customer_tier_history(customer_id,previous_tier_id,new_tier_id,assignment_source,reason,assigned_by_user_id) VALUES($1,$2,$3,'admin_override',$4,$5)`,[before.id,before.tier_id,x.tierId,x.reason,actor(request)]);return {id:before.id,tierId:x.tierId,assignmentSource:'admin_override'};});respond(response,result);}catch(error){next(error);}});
 adminController.get('/customers/:id/contacts', validate(idParams,'params'), async(request,response,next)=>{try{const {rows}=await pool.query('SELECT id,customer_id,email,display_name,created_at,portal_token_expires_at,portal_token_revoked_at FROM customer_contacts WHERE customer_id=$1 ORDER BY display_name',[id(request)]);respond(response,rows);}catch(error){next(error);}});
 adminController.post('/customers/:id/contacts', validate(idParams,'params'), validate(contactSchema), async(request,response,next)=>{try{const result=await inTransaction(async(client)=>{await getRequired(client,'customers',id(request));const x=request.validated.body;const {rows}=await client.query('INSERT INTO customer_contacts (customer_id,email,display_name) VALUES ($1,$2,$3) RETURNING id,customer_id,email,display_name,created_at',[id(request),x.email,x.displayName]);await writeAuditAndOutbox(client,{aggregateType:'customer_contact',aggregateId:rows[0].id,eventType:'customer_contact.created',actorUserId:actor(request),afterState:rows[0]});return rows[0];});respond(response,result,201);}catch(error){next(error);}});
 
@@ -55,7 +95,7 @@ adminController.put('/customer-tiers/:id', validate(idParams, 'params'), validat
     const result = await inTransaction(async (client) => {
       const before = await getRequired(client, 'customer_tiers', id(request));
       const input = request.validated.body;
-      const { rows } = await client.query(`UPDATE customer_tiers SET display_name=$1, entitlement_discount_percent=$2, is_active=$3, policy_version=policy_version+1, updated_at=now() WHERE id=$4 RETURNING *`, [input.displayName, input.entitlementDiscountPercent, input.isActive ?? before.is_active, before.id]);
+      const { rows } = await client.query(`UPDATE customer_tiers SET display_name=$1, entitlement_discount_percent=$2, qualification_spend=$3, qualification_order_count=$4, is_active=$5, policy_version=policy_version+1, updated_at=now() WHERE id=$6 RETURNING *`, [input.displayName, input.entitlementDiscountPercent, input.qualificationSpend, input.qualificationOrderCount, input.isActive ?? before.is_active, before.id]);
       await writeConfigurationRevision(client, 'customer_tier', before.id, rows[0].policy_version, actor(request), rows[0]);
       await writeAuditAndOutbox(client, { aggregateType: 'customer_tier', aggregateId: before.id, eventType: 'customer_tier.updated', actorUserId: actor(request), beforeState: before, afterState: rows[0] });
       return rows[0];

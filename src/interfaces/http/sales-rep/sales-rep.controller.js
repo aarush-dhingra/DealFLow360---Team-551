@@ -60,10 +60,10 @@ export async function createQuotation(request, response, next) {
       );
       const quote = rows[0];
       const fullCustomer = (await client.query(
-        `SELECT c.*, ct.code AS tier_code, ct.entitlement_discount_percent,
+        `SELECT c.*, ct.code AS tier_code, COALESCE(ct.entitlement_discount_percent, 0) AS entitlement_discount_percent,
                 ct.policy_version AS tier_policy_version
          FROM customers c
-         JOIN customer_tiers ct ON ct.id = c.tier_id
+         LEFT JOIN customer_tiers ct ON ct.id = c.tier_id
          WHERE c.id = $1`,
         [input.customerId]
       )).rows[0];
@@ -129,10 +129,10 @@ export async function createRevision(request, response, next) {
         throw new AppError(409, 'QUOTE_NOT_EDITABLE', 'This quotation cannot be revised.');
       }
       const customer = (await client.query(
-        `SELECT c.*, ct.code AS tier_code, ct.entitlement_discount_percent,
+        `SELECT c.*, ct.code AS tier_code, COALESCE(ct.entitlement_discount_percent, 0) AS entitlement_discount_percent,
                 ct.policy_version AS tier_policy_version
          FROM customers c
-         JOIN customer_tiers ct ON ct.id = c.tier_id
+         LEFT JOIN customer_tiers ct ON ct.id = c.tier_id
          WHERE c.id = $1`,
         [quote.customer_id]
       )).rows[0];

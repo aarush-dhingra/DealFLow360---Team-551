@@ -12,6 +12,7 @@ import { OutboxCollector } from '../../../infrastructure/events/outbox.js';
 import { Errors } from '../../../shared/errors.js';
 import { validatePayment, canVoidInvoice } from './rules.js';
 import * as repo from './repository.js';
+import { evaluateAutomaticTier } from '../../customers/tiering.service.js';
 
 export async function applyPayment({ invoiceId, amount, method, externalReference, principal }) {
   if (!invoiceId || typeof invoiceId !== 'string') throw Errors.validation('invoiceId is required');
@@ -62,8 +63,11 @@ export async function applyPayment({ invoiceId, amount, method, externalReferenc
     });
     await audit.flush();
     await outbox.flush();
+    const tierChange = statusAfter === 'paid' && invoice.status !== 'paid'
+      ? await evaluateAutomaticTier(client, invoice.customerId)
+      : null;
 
-    return { invoiceId, amount, amountPaid: amountPaidAfter, status: statusAfter, paidAt };
+    return { invoiceId, amount, amountPaid: amountPaidAfter, status: statusAfter, paidAt, tierChange };
   });
 }
 

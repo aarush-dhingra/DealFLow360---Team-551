@@ -13,7 +13,7 @@ export function clearToken(): void {
   localStorage.removeItem('df360_token');
   localStorage.removeItem('df360_user');
 }
-export function getUser(): { id: string; email: string; displayName: string; roles: string[] } | null {
+export function getUser(): { id: string; email: string; displayName: string; roles: string[]; mustChangePassword?: boolean } | null {
   try {
     const raw = localStorage.getItem('df360_user');
     return raw ? JSON.parse(raw) : null;

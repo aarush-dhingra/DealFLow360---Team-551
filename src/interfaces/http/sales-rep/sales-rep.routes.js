@@ -14,7 +14,7 @@ import { pool } from '../../../infrastructure/database/pool.js';
 quoteRouter.get('/meta/customers', async (_req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT c.id, c.legal_name, ct.code AS tier_code, ct.entitlement_discount_percent FROM customers c JOIN customer_tiers ct ON ct.id = c.tier_id ORDER BY c.legal_name`
+      `SELECT c.id, c.legal_name, COALESCE(ct.code, 'none') AS tier_code, COALESCE(ct.entitlement_discount_percent, 0) AS entitlement_discount_percent FROM customers c LEFT JOIN customer_tiers ct ON ct.id = c.tier_id ORDER BY c.legal_name`
     );
     res.json({ data: rows });
   } catch (err) { next(err); }

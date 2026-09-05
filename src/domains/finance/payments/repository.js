@@ -9,6 +9,7 @@
 const SELECT_INVOICE = `
   SELECT id,
          quotation_id    AS "quotationId",
+         customer_id     AS "customerId",
          amount_due      AS "amountDue",
          amount_paid     AS "amountPaid",
          status,

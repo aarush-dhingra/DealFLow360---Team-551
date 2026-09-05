@@ -12,11 +12,20 @@ import {
   getPortalQuotation,
   getPortalVersion
 } from '../../../domains/customer-portal/quotation.repository.js';
+import { getTierProgress } from '../../../domains/customer-portal/quotation.repository.js';
 import { getThread } from '../../../domains/customer-portal/negotiation.repository.js';
 import { acceptQuote, submitCounter } from '../../../domains/customer-portal/quotation.service.js';
 
 export function health(_req, res) {
   res.json({ status: 'customer portal online' });
+}
+
+export async function tierProgress(req, res, next) {
+  try {
+    const progress = await getTierProgress(req.user.email);
+    if (!progress) throw new NotFoundError('Customer profile');
+    ok(res, { tier: progress });
+  } catch (err) { next(err); }
 }
 
 export async function listQuotes(req, res, next) {

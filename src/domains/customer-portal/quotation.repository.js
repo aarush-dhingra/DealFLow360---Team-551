@@ -9,6 +9,18 @@ async function resolveCustomerId(userEmail) {
   return rows[0]?.customer_id ?? null;
 }
 
+export async function getTierProgress(userEmail) {
+  const customerId = await resolveCustomerId(userEmail);
+  if (!customerId) return null;
+  const { rows: customerRows } = await pool.query(`SELECT c.id,c.legal_name,c.tier_assignment_source,c.tier_assigned_at,ct.code AS tier_code,ct.display_name AS tier_name,COALESCE(ct.entitlement_discount_percent,0) AS entitlement_discount_percent
+    FROM customers c LEFT JOIN customer_tiers ct ON ct.id=c.tier_id WHERE c.id=$1`, [customerId]);
+  const { rows: totals } = await pool.query(`SELECT COALESCE(SUM(i.amount_paid-COALESCE(cn.applied_amount,0)),0) AS net_spend,count(*)::int AS completed_orders
+    FROM invoices i LEFT JOIN (SELECT invoice_id,SUM(applied_amount) AS applied_amount FROM credit_notes WHERE status='applied' GROUP BY invoice_id) cn ON cn.invoice_id=i.id
+    WHERE i.customer_id=$1 AND i.status='paid'`, [customerId]);
+  const { rows: tiers } = await pool.query(`SELECT code,display_name,entitlement_discount_percent,qualification_spend,qualification_order_count FROM customer_tiers WHERE is_active ORDER BY CASE code WHEN 'bronze' THEN 1 WHEN 'silver' THEN 2 WHEN 'gold' THEN 3 END`);
+  return { ...customerRows[0], ...totals[0], tiers };
+}
+
 export async function listPortalQuotes(userEmail, { status, limit = 50, offset = 0 } = {}) {
   const customerId = await resolveCustomerId(userEmail);
   if (!customerId) return [];

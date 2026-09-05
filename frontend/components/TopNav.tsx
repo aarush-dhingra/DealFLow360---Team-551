@@ -18,6 +18,8 @@ const navItems = [
   { label: 'Deal Health',      href: '/deal-health',        roles: ['sales_manager', 'admin'] },
   { label: 'Reports',          href: '/reports',            roles: ['sales_manager', 'admin'] },
   { label: 'Products',         href: '/products',           roles: ['sales_manager', 'admin'] },
+  { label: 'Users',            href: '/settings/users',     roles: ['admin'] },
+  { label: 'Tier Program',     href: '/settings/tier-program', roles: ['admin'] },
   { label: 'Fin: Approvals',   href: '/finance/approvals',  roles: ['finance_operations', 'admin'] },
   { label: 'Fin: Fulfillment', href: '/finance/fulfillment',roles: ['finance_operations', 'admin'] },
   { label: 'Fin: Payments',    href: '/finance/payments',   roles: ['finance_operations', 'admin'] },

@@ -6,9 +6,12 @@ const percent = z.coerce.number().finite().min(0).max(100);
 const uuid = z.string().uuid();
 
 export const idParams = z.object({ id: uuid });
-export const customerSchema = z.object({ legalName: z.string().trim().min(1).max(250), tierId: uuid, currencyCode: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/) });
+export const customerSchema = z.object({ legalName: z.string().trim().min(1).max(250), tierId: uuid.nullable().optional(), currencyCode: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/) });
+export const tierOverrideSchema = z.object({ tierId: uuid.nullable(), reason: z.string().trim().min(3).max(500) });
 export const contactSchema = z.object({ email: z.string().email().max(320).transform((value) => value.toLowerCase()), displayName: z.string().trim().min(1).max(150) });
-export const tierSchema = z.object({ displayName: z.string().trim().min(1).max(100), entitlementDiscountPercent: percent, isActive: z.boolean().optional() });
+export const internalUserSchema = z.object({ email: z.string().email().max(320).transform((value) => value.toLowerCase()), displayName: z.string().trim().min(1).max(150), password: z.string().min(8).max(128), role: z.enum(['sales_rep', 'sales_manager', 'finance_operations']) });
+export const resetPasswordSchema = z.object({ password: z.string().min(8).max(128) });
+export const tierSchema = z.object({ displayName: z.string().trim().min(1).max(100), entitlementDiscountPercent: percent, qualificationSpend: money, qualificationOrderCount: z.coerce.number().int().min(0).max(1000000), isActive: z.boolean().optional() });
 export const categorySchema = z.object({ displayName: z.string().trim().min(1).max(100), discountCeilingPercent: percent, isActive: z.boolean().optional() });
 export const productSchema = z.object({ sku: z.string().trim().min(1).max(80), name: z.string().trim().min(1).max(200), categoryId: uuid, description: z.string().trim().max(4000).nullable().optional(), unitName: z.string().trim().min(1).max(50).default('unit'), listPrice: money, standardCost: money, taxPercent: percent.default(0), billingKind: z.enum(['one_time', 'recurring']).default('one_time'), isActive: z.boolean().default(true) }).refine((value) => value.standardCost <= value.listPrice || value.listPrice === 0, { message: 'Standard cost cannot exceed list price for a sellable product.', path: ['standardCost'] });
 export const variantSchema = z.object({ sku: z.string().trim().min(1).max(80), attributes: z.record(z.string(), z.string()).default({}), extraPrice: money.default(0), isActive: z.boolean().default(true) });

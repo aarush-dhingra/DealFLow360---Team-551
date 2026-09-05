@@ -7,6 +7,7 @@ export const customerPortalRouter = Router();
 const portal = ['customer_portal'];
 
 customerPortalRouter.get('/health', requireAuth, requireRole(...portal, 'admin'), portalController.health);
+customerPortalRouter.get('/tier', requireAuth, requireRole(...portal), portalController.tierProgress);
 customerPortalRouter.get('/quotes', requireAuth, requireRole(...portal), portalController.listQuotes);
 customerPortalRouter.get('/quotes/:id', requireAuth, requireRole(...portal), portalController.getQuote);
 customerPortalRouter.get('/quotes/:id/versions/:n', requireAuth, requireRole(...portal), portalController.getVersion);

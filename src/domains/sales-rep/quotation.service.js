@@ -10,7 +10,7 @@ const amount = (value) => d(value).toDecimalPlaces(4).toFixed(4);
 const percent = (value) => d(value).toDecimalPlaces(4).toFixed(4);
 
 async function resolveCustomer(client, customerId) {
-  const { rows } = await client.query(`SELECT c.*,ct.code AS tier_code,ct.entitlement_discount_percent,ct.policy_version AS tier_policy_version FROM customers c JOIN customer_tiers ct ON ct.id=c.tier_id WHERE c.id=$1`, [customerId]);
+  const { rows } = await client.query(`SELECT c.*,ct.code AS tier_code,COALESCE(ct.entitlement_discount_percent,0) AS entitlement_discount_percent,ct.policy_version AS tier_policy_version FROM customers c LEFT JOIN customer_tiers ct ON ct.id=c.tier_id WHERE c.id=$1`, [customerId]);
   if (!rows[0]) throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer was not found.');
   return rows[0];
 }
@@ -35,7 +35,7 @@ async function resolveLine(client, input, customer, currencyCode, discountMode, 
     db: [lineNumber, product.id, input.productVariantId ?? null, product.category_id, product.name, amount(input.quantity), amount(unitPrice), amount(base), discountMode === 'line' ? percent(discount) : null, percent(allowed), amount(net), percent(product.tax_percent), {
       product: { id: product.id, sku: product.sku, name: product.name, standardCost: product.standard_cost, billingKind: product.billing_kind },
       category: { id: product.category_id, code: product.category_code, ceiling: product.discount_ceiling_percent, policyVersion: product.category_policy_version },
-      customerTier: { id: customer.tier_id, code: customer.tier_code, entitlement: customer.entitlement_discount_percent, policyVersion: customer.tier_policy_version },
+      customerTier: { id: customer.tier_id, code: customer.tier_code ?? 'none', entitlement: customer.entitlement_discount_percent, policyVersion: customer.tier_policy_version ?? 0 },
       requestedDiscountPercent: percent(discount)
     }],
     risk: { requested: discount, allowed, overage, base, excess }, base, net, tax: net.mul(d(product.tax_percent)).div(100)
@@ -50,7 +50,7 @@ export async function createQuoteVersion(client, { quotation, customer, input, a
   const discountTotal = resolved.reduce((sum, line) => sum.plus(line.base.minus(line.net)), d(0));
   const netTotal = resolved.reduce((sum, line) => sum.plus(line.net), d(0));
   const taxTotal = resolved.reduce((sum, line) => sum.plus(line.tax), d(0));
-  const tierSnapshot = { id: customer.tier_id, code: customer.tier_code, entitlementDiscountPercent: customer.entitlement_discount_percent, policyVersion: customer.tier_policy_version };
+  const tierSnapshot = { id: customer.tier_id, code: customer.tier_code ?? 'none', entitlementDiscountPercent: customer.entitlement_discount_percent, policyVersion: customer.tier_policy_version ?? 0 };
   const { rows } = await client.query(`INSERT INTO quotation_versions (quotation_id,version_number,created_by_user_id,reason,discount_mode,order_discount_percent,currency_code,pre_discount_total,discount_total,net_total,tax_total,grand_total,pricing_snapshot,policy_snapshot) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`, [quotation.id, versionNumber, actorUserId, input.reason, input.discountMode, input.discountMode === 'order' ? percent(input.orderDiscountPercent) : null, input.currencyCode, amount(preDiscountTotal), amount(discountTotal), amount(netTotal), amount(taxTotal), amount(netTotal.plus(taxTotal)), { resolvedAt: new Date().toISOString(), customerTier: tierSnapshot }, { customerTier: tierSnapshot }]);
   const version = rows[0];
   for (const line of resolved) await client.query(`INSERT INTO quotation_lines (quotation_version_id,line_number,product_id,product_variant_id,category_id,description,quantity,unit_price,line_base_value,line_discount_percent,allowed_discount_percent,net_line_value,tax_percent,line_snapshot) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, [version.id, ...line.db]);
