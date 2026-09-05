@@ -78,3 +78,12 @@ export const applyPaymentBody = z.object({
   method: z.string().trim().min(1),
   externalReference: z.string().trim().max(200).optional()
 });
+
+export const issueCreditNoteBody = z.object({
+  amount: moneyString.refine((v) => Number(v) > 0, 'amount must be greater than zero'),
+  reason: z.string().trim().min(1)
+});
+
+export const creditNoteParams = z.object({
+  creditNoteId: z.string().uuid()
+});
