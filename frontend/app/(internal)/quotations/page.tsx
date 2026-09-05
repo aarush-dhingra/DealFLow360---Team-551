@@ -4,14 +4,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, getUser } from '@/lib/api';
 
-import { routeToRisk, type BackendApprovalRoute } from '@/lib/data';
+import { routeToRisk, type BackendApprovalRoute } from '@/lib/risk';
 import { PageHeader, Badge, RiskBadge, Button, Card } from '@/components/ui';
 
 interface QuoteRow {
   id: string;
   quote_number: string;
   status: string;
-  legal_name: string;
+  legal_name?: string;
+  customer_name?: string;
   grand_total: string;
   blended_risk_percent: string | null;
   route: BackendApprovalRoute | null;
@@ -175,7 +176,7 @@ function KanbanView({ quotes: initialQuotes, onOpen }: { quotes: QuoteRow[]; onO
                     onDragEnd={() => { setDragId(null); dragSourceStatus.current = null; setDragOver(null); }}
                     className="w-full"
                   >
-                    <p className="text-sm font-medium text-gray-900">{q.legal_name}</p>
+                    <p className="text-sm font-medium text-gray-900">{q.customer_name ?? q.legal_name ?? 'Customer unavailable'}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
                       ${q.grand_total ? parseFloat(q.grand_total).toLocaleString() : '-'}
                     </p>
@@ -218,7 +219,7 @@ function TableView({ quotes, onOpen }: { quotes: QuoteRow[]; onOpen: (id: string
             {quotes.map((q) => (
               <tr key={q.id} onClick={() => onOpen(q.id)} className="cursor-pointer hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-medium text-brand">{q.quote_number}</td>
-                <td className="px-4 py-3 text-gray-900">{q.legal_name}</td>
+                <td className="px-4 py-3 text-gray-900">{q.customer_name ?? q.legal_name ?? 'Customer unavailable'}</td>
                 <td className="px-4 py-3 text-gray-700">
                   ${q.grand_total ? parseFloat(q.grand_total).toLocaleString() : '-'}
                 </td>

@@ -13,6 +13,8 @@ type Quote = {
   currency_code: string;
   last_activity_at: string;
   lock_version?: number;
+  negotiation_owner_role?: string | null;
+  negotiation_handoff_at?: string | null;
 };
 
 type Line = { id: string; product_name: string; quantity: string; net_line_value: string };
@@ -387,6 +389,12 @@ export default function CustomerPortalHome() {
                       {negotiationRequests.length === 0 && <p className="text-sm text-gray-400">No change requests submitted yet.</p>}
                     </div>
                   </div>
+                  {selected.negotiation_owner_role && (
+                    <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                      Your negotiation is currently with <strong>{selected.negotiation_owner_role === 'sales_manager' ? 'a Sales Manager' : selected.negotiation_owner_role === 'finance_operations' ? 'Finance' : 'your Sales Representative'}</strong>.
+                      {selected.negotiation_handoff_at && <span className="ml-1 text-xs text-blue-700">Updated {new Date(selected.negotiation_handoff_at).toLocaleString()}.</span>}
+                    </div>
+                  )}
 
                   {/* Negotiation form */}
                   {canNegotiate && (

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { routeToRisk, type BackendApprovalRoute } from '@/lib/data';
+import { routeToRisk, type BackendApprovalRoute } from '@/lib/risk';
 import { PageHeader, RiskBadge, Badge, Button, Card, Table, Tr, Td, InfoBanner, PipelineStep } from '@/components/ui';
 
 interface ApprovalDetail {

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, getUser } from '@/lib/api';
 import { useRoleGuard } from '@/lib/useRoleGuard';
-import { routeToRisk, type BackendApprovalRoute } from '@/lib/data';
+import { routeToRisk, type BackendApprovalRoute } from '@/lib/risk';
 import { PageHeader, RiskBadge, Badge, Card } from '@/components/ui';
 
 interface ApprovalRow {
@@ -23,6 +23,7 @@ interface ApprovalRow {
   blended_risk_percent: string;
   route: BackendApprovalRoute;
 }
+interface NegotiationRow { quotation_id:string; quote_number:string; customer_name:string; owner_role:string; last_handoff_reason:string|null; }
 
 type Filter = 'all' | 'pending' | 'returned' | 'approved';
 
@@ -38,6 +39,7 @@ export default function ApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [negotiations, setNegotiations] = useState<NegotiationRow[]>([]);
 
   const isAdmin = getUser()?.roles?.includes('admin') ?? false;
 
@@ -51,6 +53,7 @@ export default function ApprovalsPage() {
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
   }, [isAdmin]);
+  useEffect(() => { api.get<{cases:NegotiationRow[]}>('/negotiations').then(r=>setNegotiations(r.cases)).catch(()=>{}); }, []);
 
   const pending  = approvals.filter((a) => a.status === 'pending');
   const returned = approvals.filter((a) => a.status === 'returned_for_revision');
@@ -87,6 +90,10 @@ export default function ApprovalsPage() {
         <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
           Could not reach backend: {error}
         </div>
+      )}
+
+      {negotiations.length > 0 && (
+        <Card className="mb-5 p-4 border-blue-200 bg-blue-50"><h2 className="text-sm font-semibold text-blue-900">Open customer negotiations</h2><p className="mt-1 text-xs text-blue-700">These are active customer conversations, not approval decisions.</p><div className="mt-3 grid md:grid-cols-2 gap-2">{negotiations.map(n=><button key={n.quotation_id} onClick={()=>router.push(`/negotiations/${n.quotation_id}`)} className="text-left rounded border border-blue-100 bg-white px-3 py-2 hover:border-brand"><p className="text-sm font-medium">{n.customer_name}</p><p className="text-xs text-gray-500">{n.quote_number} · Continue negotiation</p>{n.last_handoff_reason&&<p className="mt-1 text-xs text-gray-500">{n.last_handoff_reason}</p>}</button>)}</div></Card>
       )}
 
       <Card>

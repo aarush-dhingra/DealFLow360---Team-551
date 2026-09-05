@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useRoleGuard } from '@/lib/useRoleGuard';
-import { routeToRisk, type BackendApprovalRoute } from '@/lib/data';
+import { routeToRisk, type BackendApprovalRoute } from '@/lib/risk';
 import { PageHeader, Card, Table, Tr, Td, Badge, RiskBadge } from '@/components/ui';
 
 interface FinanceApproval {
