@@ -17,7 +17,7 @@ export async function login(request, response, next) {
     );
     const user = rows[0];
     if (!user || !user.password_hash || !(await verifyPassword(password, user.password_hash))) {
-      throw new AppError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
+      throw new AppError(401, 'INVALID_CREDENTIALS', 'Incorrect email or password. Please try again.');
     }
     const token = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Date.now() + env.SESSION_TTL_HOURS * 60 * 60 * 1000);

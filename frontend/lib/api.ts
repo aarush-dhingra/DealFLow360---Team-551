@@ -30,7 +30,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       ...(init.headers ?? {}),
     },
   });
-  if (res.status === 401) {
+  if (res.status === 401 && getToken()) {
     clearToken();
     if (typeof window !== 'undefined') window.location.href = '/';
     throw new Error('Session expired. Please log in again.');
