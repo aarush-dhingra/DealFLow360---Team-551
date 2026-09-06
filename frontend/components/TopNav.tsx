@@ -155,21 +155,23 @@ export default function TopNav() {
           <span className="font-semibold text-base text-gray-900">DealFlow<span className="text-brand">360</span></span>
         </Link>
 
-        <nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto py-1">
-          {visibleFlat.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + '/');
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`px-3 py-1.5 rounded text-sm font-medium whitespace-nowrap transition-colors ${
-                  active ? 'bg-brand-50 text-brand-dim' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="flex min-w-0 flex-1 items-center gap-0.5 py-1">
+          <div className="flex items-center gap-0.5 overflow-x-auto min-w-0">
+            {visibleFlat.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(item.href + '/');
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`px-3 py-1.5 rounded text-sm font-medium whitespace-nowrap transition-colors ${
+                    active ? 'bg-brand-50 text-brand-dim' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
           {isAdmin && adminGroups.map((group) => (
             <NavDropdown key={group.label} label={group.label} items={group.items} pathname={pathname} />
           ))}
