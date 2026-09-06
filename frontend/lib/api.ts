@@ -20,6 +20,8 @@ export function getUser(): { id: string; email: string; displayName: string; rol
   } catch { return null; }
 }
 
+const AUTH_PATHS = ['/auth/login', '/auth/customer-signup', '/auth/forgot-password', '/auth/reset-password'];
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   const res = await fetch(`${BASE}${path}`, {
@@ -30,7 +32,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       ...(init.headers ?? {}),
     },
   });
-  if (res.status === 401 && getToken()) {
+  if (res.status === 401 && !AUTH_PATHS.includes(path)) {
     clearToken();
     if (typeof window !== 'undefined') window.location.href = '/';
     throw new Error('Session expired. Please log in again.');
