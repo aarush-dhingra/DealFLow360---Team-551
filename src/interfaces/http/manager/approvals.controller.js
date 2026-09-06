@@ -48,3 +48,9 @@ export async function escalateToFinance(req, res, next) {
     res.json(await approvalsSvc.escalateToFinance(req.params.id, req.user, data.reason));
   } catch (err) { next(err); }
 }
+
+export async function beginCustomerNegotiation(req, res, next) {
+  try {
+    res.json(await approvalsSvc.beginCustomerNegotiation(req.params.id, req.user));
+  } catch (err) { next(err); }
+}

@@ -1,6 +1,7 @@
 import { pool } from '../../infrastructure/database/pool.js';
 import { NotFoundError, ForbiddenError, ConflictError } from '../../shared/http/errors.js';
 import * as repo from './repository.js';
+import { inTransaction, writeAuditAndOutbox } from '../../infrastructure/database/transaction.js';
 
 export async function listApprovals({ requiredRole, status, limit, offset } = {}) {
   return repo.listApprovals({ requiredRole, status, limit, offset });
@@ -240,4 +241,65 @@ export async function escalateToFinance(approvalId, actorUser, reason) {
   } finally {
     client.release();
   }
+}
+
+/**
+ * A Manager can turn a pending internal approval into a customer-facing
+ * negotiation. The original approval remains in the audit trail as returned,
+ * and a final exception will enter the approval route again after negotiation.
+ */
+export async function beginCustomerNegotiation(approvalId, actorUser) {
+  if (!actorUser.roles.includes('sales_manager') && !actorUser.roles.includes('admin')) {
+    throw new ForbiddenError('Only a Sales Manager can begin a customer negotiation.');
+  }
+
+  return inTransaction(async (client) => {
+    const { rows } = await client.query(
+      `SELECT ai.*, q.status AS quote_status, q.lock_version, q.current_version_number
+       FROM approval_instances ai
+       JOIN quotations q ON q.id = ai.quotation_id
+       WHERE ai.id = $1 FOR UPDATE`,
+      [approvalId]
+    );
+    const approval = rows[0];
+    if (!approval) throw new NotFoundError('Approval');
+    if (approval.status !== 'pending' || approval.required_role !== 'sales_manager') {
+      throw new ConflictError('Only a pending Sales Manager approval can be moved into negotiation.');
+    }
+
+    const reason = 'Moved to customer negotiation by Sales Manager.';
+    await repo.updateApprovalStatus(client, approvalId, 'returned_for_revision', actorUser.id, reason);
+    await repo.recordApprovalAction(client, approvalId, actorUser.id, 'begin_customer_negotiation', reason);
+    await client.query(
+      `INSERT INTO negotiation_cases(quotation_id, owner_role, status, last_handoff_reason, updated_at)
+       VALUES($1, 'sales_manager', 'open', $2, now())
+       ON CONFLICT(quotation_id) DO UPDATE SET
+         owner_role='sales_manager', status='open', last_handoff_reason=EXCLUDED.last_handoff_reason,
+         resolved_at=NULL, updated_at=now()
+       RETURNING id`,
+      [approval.quotation_id, reason]
+    );
+    const caseRow = (await client.query(
+      `SELECT id FROM negotiation_cases WHERE quotation_id=$1`, [approval.quotation_id]
+    )).rows[0];
+    await client.query(
+      `INSERT INTO negotiation_case_events(negotiation_case_id,event_type,actor_user_id,to_role,reason,quotation_version_number)
+       VALUES($1,'manager_opened_customer_negotiation',$2,'sales_manager',$3,$4)`,
+      [caseRow.id, actorUser.id, reason, approval.current_version_number]
+    );
+    await client.query(
+      `UPDATE quotations
+       SET status='under_negotiation', lock_version=lock_version+1, last_activity_at=now(), updated_at=now()
+       WHERE id=$1`,
+      [approval.quotation_id]
+    );
+    await writeAuditAndOutbox(client, {
+      aggregateType: 'approval_instance', aggregateId: approvalId,
+      eventType: 'approval.moved_to_customer_negotiation', actorUserId: actorUser.id,
+      beforeState: { approvalStatus: 'pending', quoteStatus: approval.quote_status },
+      afterState: { approvalStatus: 'returned_for_revision', quoteStatus: 'under_negotiation' },
+      metadata: { quotationId: approval.quotation_id, negotiationCaseId: caseRow.id }
+    });
+    return { quotationId: approval.quotation_id, negotiationCaseId: caseRow.id, status: 'under_negotiation' };
+  });
 }

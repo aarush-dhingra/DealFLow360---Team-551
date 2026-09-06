@@ -73,6 +73,7 @@ managerRouter.post('/approvals/:id/approve', requireAuth, requireRole(...reviewe
 managerRouter.post('/approvals/:id/reject', requireAuth, requireRole(...reviewers), approvalController.rejectQuotation);
 managerRouter.post('/approvals/:id/return', requireAuth, requireRole(...reviewers), approvalController.returnForRevision);
 managerRouter.post('/approvals/:id/escalate', requireAuth, requireRole(...managers), approvalController.escalateToFinance);
+managerRouter.post('/approvals/:id/negotiate', requireAuth, requireRole(...managers), approvalController.beginCustomerNegotiation);
 
 // ─── Deal health ──────────────────────────────────────────────────────────────
 

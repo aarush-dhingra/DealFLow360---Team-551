@@ -71,6 +71,17 @@ export default function ApprovalDetailPage() {
     }
   }
 
+  async function beginNegotiation() {
+    setActing(true);
+    try {
+      const result = await api.post<{ quotationId: string }>(`/manager/approvals/${id}/negotiate`, {});
+      router.push(`/negotiations/${result.quotationId}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not open customer negotiation.');
+      setActing(false);
+    }
+  }
+
   if (loading) return <div className="p-8 text-gray-400 text-sm">Loading...</div>;
   if (error && !detail) return <div className="p-8 text-red-500 text-sm">Error: {error}</div>;
   if (!detail) return <div className="p-8 text-gray-500">Approval not found.</div>;
@@ -214,6 +225,9 @@ export default function ApprovalDetailPage() {
             {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
             <div className="flex gap-3 flex-wrap">
+              {detail.required_role === 'sales_manager' && (
+                <Button variant="secondary" onClick={beginNegotiation} disabled={acting}>Negotiate with Customer</Button>
+              )}
               <Button variant="primary" onClick={() => doAction('approve')} disabled={acting}>Approve</Button>
               <Button variant="warning" onClick={() => doAction('return')} disabled={acting || !reason.trim()}>Return for Revision</Button>
               <Button variant="danger"  onClick={() => doAction('reject')} disabled={acting || !reason.trim()}>Reject</Button>
