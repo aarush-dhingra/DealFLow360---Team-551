@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { PageHeader, InfoBanner, Button, Card, Table, Tr, Td } from '@/components/ui';
+import { PageHeader, Button, Card, Table, Tr, Td } from '@/components/ui';
 
 interface Tier { code: string; display_name: string; entitlement_discount_percent: string }
 interface Category { code: string; display_name: string; discount_ceiling_percent: string }
@@ -133,10 +133,7 @@ export default function DiscountTiersPage() {
             </div>
           </Card>
 
-          <InfoBanner>
-            When a quote mixes categories with different ceilings, the system computes a blended risk score and routes to the highest required level.
-            <br />All approvals, rejections, and edits are logged with user, timestamp, and reason.
-          </InfoBanner>
+
 
           <div className="mt-5">
             <Button variant="primary" onClick={savePolicy} disabled={saving}>

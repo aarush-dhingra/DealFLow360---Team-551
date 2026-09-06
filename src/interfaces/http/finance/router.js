@@ -40,7 +40,7 @@ financeRouter.get(
 
 financeRouter.post(
   '/fulfillment/quotations/:quotationId/allocate',
-  requireFinance,
+  requireFinanceOrManager,
   allocateFulfillmentController
 );
 

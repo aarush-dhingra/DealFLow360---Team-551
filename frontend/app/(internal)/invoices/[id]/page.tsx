@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { PageHeader, Badge, InfoBanner, Button, Card, PipelineStep, Table, Tr, Td } from '@/components/ui';
+import { PageHeader, Badge, Button, Card, PipelineStep, Table, Tr, Td } from '@/components/ui';
 
 interface Payment {
   id: string;
@@ -150,7 +150,6 @@ export default function InvoiceDetailPage() {
         </>
       )}
 
-      <InfoBanner>Partial invoicing stays reconciled with partial delivery — nothing is billed before it ships.</InfoBanner>
 
       <div className="mt-5 flex gap-3">
         <Button variant="primary" onClick={() => router.push(`/finance/payments`)}>Record Payment</Button>
