@@ -99,6 +99,56 @@ export async function customerSignup(request, response, next) {
   } catch (error) { next(error); }
 }
 
+export async function forgotPassword(request, response, next) {
+  try {
+    const { email } = request.validated.body;
+    const { rows } = await pool.query(
+      `SELECT id FROM users WHERE email = $1 AND is_active = TRUE LIMIT 1`,
+      [email]
+    );
+    if (!rows[0]) {
+      // Don't reveal whether the email exists
+      return response.json({ data: { message: 'If that email is registered, a reset token has been generated.' } });
+    }
+    const token = randomBytes(32).toString('base64url');
+    const hash = createHash('sha256').update(token).digest('hex');
+    await pool.query(
+      `INSERT INTO password_reset_tokens (user_id, token_hash) VALUES ($1, $2)`,
+      [rows[0].id, hash]
+    );
+    response.json({ data: { token } });
+  } catch (error) { next(error); }
+}
+
+export async function resetPassword(request, response, next) {
+  try {
+    const { token, newPassword } = request.validated.body;
+    const hash = createHash('sha256').update(token).digest('hex');
+    const { rows } = await pool.query(
+      `SELECT id, user_id FROM password_reset_tokens
+       WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
+       LIMIT 1`,
+      [hash]
+    );
+    if (!rows[0]) throw new AppError(400, 'INVALID_TOKEN', 'Reset token is invalid or has expired.');
+    const { hashPassword } = await import('./password.js');
+    const passwordHash = await hashPassword(newPassword);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`UPDATE password_reset_tokens SET used_at = now() WHERE id = $1`, [rows[0].id]);
+      await client.query(
+        `UPDATE users SET password_hash = $1, must_change_password = FALSE, updated_at = now() WHERE id = $2`,
+        [passwordHash, rows[0].user_id]
+      );
+      await client.query(`UPDATE auth_sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [rows[0].user_id]);
+      await client.query('COMMIT');
+    } catch (err) { await client.query('ROLLBACK'); throw err; }
+    finally { client.release(); }
+    response.json({ data: { message: 'Password reset successfully. You can now log in.' } });
+  } catch (error) { next(error); }
+}
+
 export function currentUser(request, response) {
   response.json({ data: request.principal });
 }

@@ -8,11 +8,14 @@ import { api, setToken } from '@/lib/api';
 export default function LoginPage() {
   const router = useRouter();
   const [tab, setTab] = useState<'login' | 'customerSignup'>('login');
+  const [step, setStep] = useState<'form' | 'forgot' | 'forgotDone'>('form');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -30,6 +33,19 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.post<{ data: { token?: string; message?: string } }>('/auth/forgot-password', { email });
+      setResetToken(res.data.token ?? '');
+      setStep('forgotDone');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Request failed');
+    } finally { setLoading(false); }
   }
 
   async function handleCustomerSignup(e: React.FormEvent) {
@@ -59,68 +75,112 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-          <div className="flex rounded-lg bg-gray-100 p-1 mb-6">
-            {(['login', 'customerSignup'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => { setTab(t); setError(''); }}
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors capitalize ${
-                  tab === t ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
-                }`}
-              >
-                {t === 'login' ? 'Log In' : 'Customer Sign Up'}
+          {step === 'forgot' && (
+            <>
+              <button onClick={() => { setStep('form'); setError(''); }} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-4">
+                ← Back to login
               </button>
-            ))}
-          </div>
-
-          {error && (
-            <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              {error}
-            </div>
+              <h2 className="text-base font-semibold text-gray-900 mb-1">Reset your password</h2>
+              <p className="text-xs text-gray-500 mb-4">Enter your email and we&apos;ll generate a reset token for you.</p>
+              {error && <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+                </div>
+                <button type="submit" disabled={loading} className="w-full bg-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-brand-dim transition-colors disabled:opacity-60">
+                  {loading ? 'Please wait...' : 'Generate Reset Token'}
+                </button>
+              </form>
+            </>
           )}
 
-          <form onSubmit={tab === 'login' ? handleLogin : handleCustomerSignup} className="space-y-4">
-            {tab === 'customerSignup' && (
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Your name</label>
-                <input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+          {step === 'forgotDone' && (
+            <>
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 mb-4">
+                <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
               </div>
-            )}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Password</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-brand-dim transition-colors disabled:opacity-60"
-            >
-              {loading ? 'Please wait...' : tab === 'login' ? 'Log In' : 'Create Customer Account'}
-            </button>
-            {tab === 'login' && (
-              <button type="button" className="w-full text-sm text-gray-500 hover:text-gray-700 text-center">
-                Forgot Password?
-              </button>
-            )}
-          </form>
+              <h2 className="text-base font-semibold text-gray-900 mb-1">Reset token generated</h2>
+              <p className="text-xs text-gray-500 mb-3">Copy the token below and use it to set a new password.</p>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-4 break-all text-xs font-mono text-gray-800 select-all">{resetToken}</div>
+              <a href={`/reset-password?token=${encodeURIComponent(resetToken)}`} className="block w-full text-center bg-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-brand-dim transition-colors">
+                Set New Password →
+              </a>
+              <button onClick={() => { setStep('form'); setError(''); setResetToken(''); }} className="mt-3 w-full text-xs text-gray-400 hover:text-gray-600 text-center">Back to login</button>
+            </>
+          )}
+
+          {step === 'form' && (
+            <>
+              <div className="flex rounded-lg bg-gray-100 p-1 mb-6">
+                {(['login', 'customerSignup'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => { setTab(t); setError(''); }}
+                    className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors capitalize ${
+                      tab === t ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+                    }`}
+                  >
+                    {t === 'login' ? 'Log In' : 'Customer Sign Up'}
+                  </button>
+                ))}
+              </div>
+
+              {error && (
+                <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+              {info && (
+                <div className="mb-4 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                  {info}
+                </div>
+              )}
+
+              <form onSubmit={tab === 'login' ? handleLogin : handleCustomerSignup} className="space-y-4">
+                {tab === 'customerSignup' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Your name</label>
+                    <input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-brand-dim transition-colors disabled:opacity-60"
+                >
+                  {loading ? 'Please wait...' : tab === 'login' ? 'Log In' : 'Create Customer Account'}
+                </button>
+                {tab === 'login' && (
+                  <button type="button" onClick={() => { setStep('forgot'); setError(''); }} className="w-full text-sm text-gray-500 hover:text-gray-700 text-center">
+                    Forgot Password?
+                  </button>
+                )}
+              </form>
+            </>
+          )}
         </div>
 
         {tab === 'customerSignup' && <p className="mt-3 text-center text-xs text-gray-400">Create an account to view and manage your quotes.</p>}
