@@ -16,7 +16,8 @@ const SELECT_QUOTE = `
 const SELECT_PHYSICAL_LINES = `
   SELECT ql.id         AS "quotationLineId",
          ql.product_id AS "productId",
-         ql.quantity
+         ql.quantity,
+         p.name        AS "productName"
   FROM quotation_lines ql
   JOIN quotation_versions qv ON qv.id = ql.quotation_version_id
   JOIN quotations q           ON q.id = qv.quotation_id
@@ -38,7 +39,7 @@ const SELECT_INVENTORY = `
 `;
 
 const SELECT_WAREHOUSES = `
-  SELECT id, code, shipping_cost_weight AS "shippingCostWeight"
+  SELECT id, code, name, shipping_cost_weight AS "shippingCostWeight"
   FROM warehouses
   WHERE is_active = TRUE
 `;

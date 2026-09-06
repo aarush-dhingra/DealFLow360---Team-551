@@ -9,7 +9,7 @@ interface Quote {
   id: string;
   quote_number: string;
   status: string;
-  legal_name: string;
+  customer_name: string;
   grand_total: string;
 }
 
@@ -44,12 +44,9 @@ export default function FinanceFulfillmentPage() {
   const [actionResult, setActionResult] = useState<Record<string, { message: string; isError: boolean }>>({});
 
   useEffect(() => {
-    Promise.all([
-      api.get<{ quotations: Quote[] }>('/manager/quotations?status=approved'),
-      api.get<{ quotations: Quote[] }>('/manager/quotations?status=in_fulfillment').catch(() => ({ quotations: [] })),
-    ])
-      .then(([approved, inflight]) => {
-        setQuotes([...(approved.quotations ?? []), ...(inflight.quotations ?? [])]);
+    api.get<{ data: { quotations: Quote[] } }>('/finance/fulfillment/queue')
+      .then((queue) => {
+        setQuotes(queue.data.quotations ?? []);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -121,7 +118,7 @@ export default function FinanceFulfillmentPage() {
               <React.Fragment key={q.id}>
                 <Tr onClick={() => selectQuote(q.id)} clickable>
                   <Td className="font-medium text-brand">{q.quote_number}</Td>
-                  <Td>{q.legal_name}</Td>
+                  <Td>{q.customer_name}</Td>
                   <Td>${q.grand_total ? parseFloat(q.grand_total).toLocaleString() : '-'}</Td>
                   <Td>
                     <Badge variant={q.status === 'approved' ? 'blue' : 'yellow'}>
@@ -178,7 +175,7 @@ export default function FinanceFulfillmentPage() {
                           </div>
 
                           <div className="flex gap-2 pt-1">
-                            {q.status === 'approved' && (
+                            {['approved', 'customer_confirmed', 'confirmed'].includes(q.status) && (
                               <Button variant="primary" onClick={() => allocate(q.id)} disabled={acting}>
                                 Allocate (Suggested)
                               </Button>

@@ -44,6 +44,8 @@ export async function previewFulfillmentPlan({ quotationId }) {
       repo.findWarehouses(client)
     ]);
     const plan = suggestAllocations({ lines, inventory, warehouses });
+    const productById = new Map(lines.map((line) => [line.productId, line.productName]));
+    const warehouseById = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse.name || warehouse.code]));
     return {
       quotationId,
       quoteStatus: quote.status,
@@ -51,9 +53,27 @@ export async function previewFulfillmentPlan({ quotationId }) {
       hasBackorder: plan.allocations.some((a) => a.status === 'backordered'),
       shipmentCount: plan.shipmentCount,
       shippingCostTotal: plan.shippingCostTotal,
-      allocations: plan.allocations
+      allocations: plan.allocations.map((allocation) => ({
+        ...allocation,
+        productName: productById.get(allocation.productId) ?? 'Product',
+        warehouseName: warehouseById.get(allocation.warehouseId) ?? 'Unassigned warehouse'
+      }))
     };
   });
+}
+
+export async function listFulfillmentQueue() {
+  const { pool } = await import('../../../infrastructure/database/pool.js');
+  const { rows } = await pool.query(
+    `SELECT q.id, q.quote_number, q.status, c.legal_name AS customer_name,
+            qv.grand_total, qv.currency_code, q.last_activity_at
+     FROM quotations q
+     JOIN customers c ON c.id=q.customer_id
+     JOIN quotation_versions qv ON qv.quotation_id=q.id AND qv.version_number=q.current_version_number
+     WHERE q.status IN ('approved','customer_confirmed','confirmed','in_fulfillment')
+     ORDER BY q.last_activity_at DESC`
+  );
+  return rows;
 }
 
 export async function allocateFulfillment({ quotationId, mode, manualAllocations, principal }) {

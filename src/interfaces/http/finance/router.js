@@ -12,6 +12,7 @@ import { requireFinance, requireFinanceOrManager, errorHandler } from './middlew
 import { decideApprovalController } from './approval.controller.js';
 import {
   previewPlanController,
+  fulfillmentQueueController,
   allocateFulfillmentController,
   consolidateBackordersController
 } from './fulfillment.controller.js';
@@ -20,6 +21,7 @@ import {
   issueCreditNoteController,
   applyCreditNoteController
 } from './credit-notes.controller.js';
+import { getInventoryWorkspace, createWarehouse, updateWarehouse, adjustInventory, bootstrapStarterInventory } from './inventory.controller.js';
 
 export const financeRouter = Router();
 
@@ -32,6 +34,12 @@ financeRouter.post(
 );
 
 // Manager may view fulfillment (GET) but not allocate; Finance allocates.
+financeRouter.get(
+  '/fulfillment/queue',
+  requireFinanceOrManager,
+  fulfillmentQueueController
+);
+
 financeRouter.get(
   '/fulfillment/quotations/:quotationId/plan',
   requireFinanceOrManager,
@@ -75,6 +83,12 @@ financeRouter.post(
   requireFinance,
   applyCreditNoteController
 );
+
+financeRouter.get('/inventory', requireFinance, getInventoryWorkspace);
+financeRouter.post('/inventory/starter-setup', requireFinance, bootstrapStarterInventory);
+financeRouter.post('/inventory/warehouses', requireFinance, createWarehouse);
+financeRouter.put('/inventory/warehouses/:warehouseId', requireFinance, updateWarehouse);
+financeRouter.post('/inventory/warehouses/:warehouseId/adjustments', requireFinance, adjustInventory);
 
 // Keep the error envelope local to finance routes.
 financeRouter.use(errorHandler);
