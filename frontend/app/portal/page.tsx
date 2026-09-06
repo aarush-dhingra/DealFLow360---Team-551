@@ -56,7 +56,10 @@ type TierProgress = {
   tiers: Array<{ code: string; display_name: string; qualification_spend: string; qualification_order_count: number }>;
 };
 
-const COMPLETE = new Set(['fulfilled', 'invoiced', 'partially_paid', 'paid']);
+// Customer-facing completion starts when the customer accepts the deal. Tier
+// qualification remains payment-based in the API, so a confirmed order is not
+// incorrectly counted as paid spend.
+const COMPLETED = new Set(['customer_confirmed', 'confirmed', 'in_fulfillment', 'partially_fulfilled', 'fulfilled', 'invoiced', 'partially_paid', 'paid']);
 const TABS = [
   ['outstanding', 'Outstanding'],
   ['negotiations', 'Negotiations'],
@@ -120,12 +123,13 @@ export default function CustomerPortalHome() {
   const hasOpenNegotiation = (quote: Quote | Detail) => quote.negotiation_case_status === 'open' || quote.status === 'under_negotiation';
 
   const openNegotiationCount = useMemo(() => quotes.filter(hasOpenNegotiation).length, [quotes]);
+  const completedCount = useMemo(() => quotes.filter((quote) => COMPLETED.has(quote.status)).length, [quotes]);
 
   const visible = useMemo(() =>
     quotes.filter((q) =>
-      tab === 'completed' ? COMPLETE.has(q.status) :
+      tab === 'completed' ? COMPLETED.has(q.status) :
       tab === 'negotiations' ? hasOpenNegotiation(q) :
-      !COMPLETE.has(q.status) && !hasOpenNegotiation(q)
+      !COMPLETED.has(q.status) && !hasOpenNegotiation(q)
     ),
     [quotes, tab]
   );
@@ -186,6 +190,7 @@ export default function CustomerPortalHome() {
       await api.post(`/portal/quotes/${selected.id}/accept`, { lock_version: selected.lock_version });
       await select(selected);
       loadQuotes();
+      setTab('completed');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not confirm order.');
     }
@@ -275,7 +280,7 @@ export default function CustomerPortalHome() {
               onClick={() => setTab(key)}
               className={`px-4 py-2 text-sm ${tab === key ? 'border-b-2 border-brand text-brand font-medium' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              {label}{key === 'negotiations' && openNegotiationCount > 0 ? ` (${openNegotiationCount})` : ''}
+              {label}{key === 'negotiations' && openNegotiationCount > 0 ? ` (${openNegotiationCount})` : key === 'completed' && completedCount > 0 ? ` (${completedCount})` : ''}
             </button>
           ))}
         </div>
@@ -368,7 +373,7 @@ export default function CustomerPortalHome() {
                           {q.assigned_sales_rep_name && <p className="mt-1 text-xs text-gray-500">Sales rep: {q.assigned_sales_rep_name}</p>}
                         </div>
                         <div className="text-right">
-                          <Badge variant={q.status === 'under_negotiation' ? 'yellow' : COMPLETE.has(q.status) ? 'green' : 'blue'}>
+                          <Badge variant={q.status === 'under_negotiation' ? 'yellow' : COMPLETED.has(q.status) ? 'green' : 'blue'}>
                             {q.status.replaceAll('_', ' ')}
                           </Badge>
                           <p className="mt-2 text-sm font-medium">{q.currency_code} {Number(q.grand_total).toFixed(2)}</p>
@@ -525,7 +530,11 @@ export default function CustomerPortalHome() {
                   {/* Confirmed / closed state */}
                   {!canNegotiate && (
                     <div className="border-t pt-4 px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-600">
-                      <span className="font-medium capitalize">{selected.status.replaceAll('_', ' ')}</span>
+                      {selected.status === 'customer_confirmed' ? (
+                        <><span className="font-medium text-emerald-700">Order confirmed.</span> Your sales team will begin fulfilment shortly.</>
+                      ) : (
+                        <span className="font-medium capitalize">{selected.status.replaceAll('_', ' ')}</span>
+                      )}
                     </div>
                   )}
                 </Card>
