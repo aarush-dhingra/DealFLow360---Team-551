@@ -55,6 +55,7 @@ type TierProgress = {
   completed_orders: number;
   tiers: Array<{ code: string; display_name: string; qualification_spend: string; qualification_order_count: number }>;
 };
+type BillingInvoice = { id: string; invoice_number: string; quote_number: string; status: string; currency_code: string; amount_due: string; amount_paid: string; applied_credit_total: string; outstanding_balance: string; due_at: string | null; issued_at: string; credit_notes: Array<{ id: string; amount: string; status: string; reason: string; created_at: string }> };
 
 // Customer-facing completion starts when the customer accepts the deal. Tier
 // qualification remains payment-based in the API, so a confirmed order is not
@@ -64,10 +65,11 @@ const TABS = [
   ['outstanding', 'Outstanding'],
   ['negotiations', 'Negotiations'],
   ['completed', 'Completed'],
+  ['billing', 'Billing'],
   ['requests', 'My Requests'],
 ] as const;
 
-type Tab = 'outstanding' | 'negotiations' | 'completed' | 'requests';
+type Tab = 'outstanding' | 'negotiations' | 'completed' | 'billing' | 'requests';
 
 export default function CustomerPortalHome() {
   const router = useRouter();
@@ -77,6 +79,7 @@ export default function CustomerPortalHome() {
   const [initialOffer, setInitialOffer] = useState<OfferVersion | null>(null);
   const [negotiationRequests, setNegotiationRequests] = useState<NegotiationRequest[]>([]);
   const [tier, setTier] = useState<TierProgress | null>(null);
+  const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [tab, setTab] = useState<Tab>('outstanding');
   const [error, setError] = useState('');
 
@@ -106,12 +109,17 @@ export default function CustomerPortalHome() {
     api.get<{ requests: QuoteRequest[] }>('/portal/quote-requests')
       .then((r) => setMyRequests(r.requests))
       .catch(() => {});
+  const loadBilling = useCallback(() =>
+    api.get<{ invoices: BillingInvoice[] }>('/portal/billing')
+      .then((response) => setInvoices(response.invoices))
+      .catch(() => {}), []);
 
   useEffect(() => {
     const user = getUser();
     if (!user?.roles.includes('customer_portal')) { router.replace('/'); return; }
     loadQuotes();
     loadRequests();
+    loadBilling();
     api.get<{ tier: TierProgress }>('/portal/tier')
       .then((r) => setTier(r.tier))
       .catch(() => {});
@@ -119,6 +127,7 @@ export default function CustomerPortalHome() {
 
   useLiveUpdates(loadQuotes);
   useLiveUpdates(loadRequests);
+  useLiveUpdates(loadBilling);
 
   const hasOpenNegotiation = (quote: Quote | Detail) => quote.negotiation_case_status === 'open' || quote.status === 'under_negotiation';
 
@@ -280,13 +289,18 @@ export default function CustomerPortalHome() {
               onClick={() => setTab(key)}
               className={`px-4 py-2 text-sm ${tab === key ? 'border-b-2 border-brand text-brand font-medium' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              {label}{key === 'negotiations' && openNegotiationCount > 0 ? ` (${openNegotiationCount})` : key === 'completed' && completedCount > 0 ? ` (${completedCount})` : ''}
+              {label}{key === 'negotiations' && openNegotiationCount > 0 ? ` (${openNegotiationCount})` : key === 'completed' && completedCount > 0 ? ` (${completedCount})` : key === 'billing' && invoices.length > 0 ? ` (${invoices.length})` : ''}
             </button>
           ))}
         </div>
 
         {/* Quote Request tab */}
-        {tab === 'requests' ? (
+        {tab === 'billing' ? (
+          <section className="mt-5 max-w-4xl space-y-4">
+            <Card className="p-5"><div className="flex flex-wrap justify-between gap-4"><div><p className="text-xs font-medium uppercase tracking-wide text-gray-500">Billing</p><h2 className="mt-1 text-lg font-semibold text-gray-900">Invoices and credit notes</h2><p className="mt-1 text-sm text-gray-500">Finance issues invoices after your order is confirmed. Payment status updates here automatically.</p></div><div className="text-right"><p className="text-xs uppercase tracking-wide text-gray-500">Outstanding</p><p className="mt-1 text-xl font-semibold text-gray-900">{invoices.reduce((sum, invoice) => sum + Number(invoice.outstanding_balance), 0).toLocaleString()}</p></div></div></Card>
+            {invoices.length === 0 ? <Card className="p-5 text-sm text-gray-500">No invoices have been issued for your orders yet.</Card> : invoices.map((invoice) => <Card key={invoice.id} className="p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold text-gray-900">{invoice.invoice_number}</h3><p className="mt-1 text-sm text-gray-500">Order {invoice.quote_number} · issued {new Date(invoice.issued_at).toLocaleDateString()}</p></div><Badge variant={['paid','credited'].includes(invoice.status) ? 'green' : invoice.status === 'overdue' ? 'red' : 'yellow'}>{invoice.status.replaceAll('_',' ')}</Badge></div><div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4"><div><p className="text-gray-500">Due</p><p className="font-medium text-gray-900">{invoice.currency_code} {Number(invoice.amount_due).toFixed(2)}</p></div><div><p className="text-gray-500">Paid</p><p className="font-medium text-gray-900">{invoice.currency_code} {Number(invoice.amount_paid).toFixed(2)}</p></div><div><p className="text-gray-500">Credits</p><p className="font-medium text-gray-900">{invoice.currency_code} {Number(invoice.applied_credit_total).toFixed(2)}</p></div><div><p className="text-gray-500">Balance</p><p className="font-medium text-gray-900">{invoice.currency_code} {Number(invoice.outstanding_balance).toFixed(2)}</p></div></div>{invoice.credit_notes.length > 0 && <div className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{invoice.credit_notes.map((note) => <p key={note.id}>Credit note · {invoice.currency_code} {Number(note.amount).toFixed(2)} · {note.status.replaceAll('_',' ')}{note.reason ? ` — ${note.reason}` : ''}</p>)}</div>}</Card>)}
+          </section>
+        ) : tab === 'requests' ? (
           <div className="mt-5 max-w-2xl space-y-6">
             <Card className="p-5">
               <h2 className="font-semibold text-gray-900 mb-1">Request a Quotation</h2>

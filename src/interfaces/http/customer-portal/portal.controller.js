@@ -14,7 +14,7 @@ import {
   getPortalQuotation,
   getPortalVersion
 } from '../../../domains/customer-portal/quotation.repository.js';
-import { getTierProgress } from '../../../domains/customer-portal/quotation.repository.js';
+import { getTierProgress, listPortalBilling } from '../../../domains/customer-portal/quotation.repository.js';
 import { getThread } from '../../../domains/customer-portal/negotiation.repository.js';
 import { acceptQuote, rejectQuote, submitCounter } from '../../../domains/customer-portal/quotation.service.js';
 
@@ -77,6 +77,12 @@ export async function acceptQuotation(req, res, next) {
     const { resolveCase } = await import('../negotiations/negotiation.controller.js');
     await import('../../../infrastructure/database/transaction.js').then(({ inTransaction }) => inTransaction((client) => resolveCase(req.params.id, null, client)));
     ok(res, result);
+  } catch (err) { next(err); }
+}
+
+export async function listBilling(req, res, next) {
+  try {
+    ok(res, { invoices: await listPortalBilling(req.user.email) });
   } catch (err) { next(err); }
 }
 

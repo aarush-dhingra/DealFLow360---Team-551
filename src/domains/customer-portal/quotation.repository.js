@@ -21,6 +21,29 @@ export async function getTierProgress(userEmail) {
   return { ...customerRows[0], ...totals[0], tiers };
 }
 
+export async function listPortalBilling(userEmail) {
+  const customerId = await resolveCustomerId(userEmail);
+  if (!customerId) return [];
+  const { rows } = await pool.query(
+    `SELECT i.id, i.invoice_number, i.status, i.currency_code, i.amount_due, i.amount_paid,
+            i.issued_at, i.due_at, q.quote_number,
+            COALESCE(credits.applied_total, 0) AS applied_credit_total,
+            GREATEST(i.amount_due - i.amount_paid - COALESCE(credits.applied_total, 0), 0) AS outstanding_balance,
+            COALESCE(credits.notes, '[]'::json) AS credit_notes
+     FROM invoices i
+     JOIN quotations q ON q.id=i.quotation_id
+     LEFT JOIN LATERAL (
+       SELECT SUM(cn.applied_amount) FILTER (WHERE cn.status='applied') AS applied_total,
+              json_agg(json_build_object('id', cn.id, 'amount', cn.amount, 'status', cn.status, 'reason', cn.reason, 'created_at', cn.created_at) ORDER BY cn.created_at DESC) AS notes
+       FROM credit_notes cn WHERE cn.invoice_id=i.id
+     ) credits ON true
+     WHERE i.customer_id=$1
+     ORDER BY i.issued_at DESC, i.invoice_number DESC`,
+    [customerId]
+  );
+  return rows;
+}
+
 export async function listPortalQuotes(userEmail, { status, limit = 50, offset = 0 } = {}) {
   const customerId = await resolveCustomerId(userEmail);
   if (!customerId) return [];
