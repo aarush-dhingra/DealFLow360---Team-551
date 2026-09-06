@@ -78,15 +78,17 @@ export async function reviseCase(req, res, next) {
       const { rows: customers } = await client.query(`SELECT c.*,ct.code AS tier_code,COALESCE(ct.entitlement_discount_percent,0) AS entitlement_discount_percent,ct.policy_version AS tier_policy_version FROM customers c LEFT JOIN customer_tiers ct ON ct.id=c.tier_id WHERE c.id=$1`, [item.customer_id]);
       const quotation = { id: item.quotation_id };
       const { version, assessment } = await createQuoteVersion(client, { quotation, customer: customers[0], input, actorUserId: req.principal.id, versionNumber: item.current_version_number + 1 });
-      const nextStatus = await routeApproval(client, {
-        quotation: { id: item.quotation_id }, version, assessment, actorUserId: req.principal.id
-      });
-      await client.query(`UPDATE quotations SET current_version_number=$1,lock_version=lock_version+1,last_activity_at=now(),updated_at=now() WHERE id=$2`, [version.version_number, item.quotation_id]);
+
+      // Send to customer — do NOT re-enter the internal approval loop.
+      // The case stays open; it resolves when the customer accepts or the manager closes it.
+      await client.query(
+        `UPDATE quotations SET status='sent_to_customer',current_version_number=$1,lock_version=lock_version+1,last_activity_at=now(),updated_at=now() WHERE id=$2`,
+        [version.version_number, item.quotation_id]
+      );
       await client.query(`UPDATE negotiation_requests SET status='revised',resolved_at=now() WHERE quotation_id=$1 AND status='open'`, [item.quotation_id]);
-      await client.query(`UPDATE negotiation_cases SET status='resolved',resolved_at=now(),updated_at=now() WHERE id=$1`, [item.id]);
       await client.query(`INSERT INTO negotiation_case_events(negotiation_case_id,event_type,actor_user_id,quotation_version_number) VALUES($1,'revised_offer_sent',$2,$3)`, [item.id,req.principal.id,version.version_number]);
-      await writeAuditAndOutbox(client,{aggregateType:'quotation',aggregateId:item.quotation_id,eventType:'negotiation.revised_offer_sent',actorUserId:req.principal.id,afterState:{status:nextStatus,ownerRole:item.owner_role},metadata:{versionNumber:version.version_number,caseId:item.id,blendedRiskPercent:assessment.blended_risk_percent,route:assessment.route}});
-      return { version, status: nextStatus, owner_role: item.owner_role };
+      await writeAuditAndOutbox(client,{aggregateType:'quotation',aggregateId:item.quotation_id,eventType:'negotiation.revised_offer_sent',actorUserId:req.principal.id,afterState:{status:'sent_to_customer',ownerRole:item.owner_role},metadata:{versionNumber:version.version_number,caseId:item.id,blendedRiskPercent:assessment.blended_risk_percent,route:assessment.route}});
+      return { version, status: 'sent_to_customer', owner_role: item.owner_role };
     });
     res.status(201).json({ data: result });
   } catch (error) { next(error); }
