@@ -222,6 +222,97 @@ export async function getNegotiationRequests(request, response, next) {
   } catch (error) { next(error); }
 }
 
+export async function sendToCustomer(request, response, next) {
+  try {
+    const result = await inTransaction(async (client) => {
+      const quote = await quoteForAccess(client, request, request.validated.params.quoteId, true);
+      if (quote.status !== 'approved') {
+        throw new AppError(409, 'INVALID_STATUS', `Cannot send quotation with status '${quote.status}' to customer. Expected: approved.`);
+      }
+      await client.query(
+        `UPDATE quotations SET status='sent_to_customer', lock_version=lock_version+1, last_activity_at=now(), updated_at=now() WHERE id=$1`,
+        [quote.id]
+      );
+      await writeAuditAndOutbox(client, {
+        aggregateType: 'quotation', aggregateId: quote.id,
+        eventType: 'quotation.sent_to_customer',
+        actorUserId: request.principal.id,
+        beforeState: { status: quote.status },
+        afterState: { status: 'sent_to_customer' },
+        metadata: { quotationId: quote.id },
+      });
+      return { status: 'sent_to_customer', lockVersion: quote.lock_version + 1 };
+    });
+    response.json({ data: result });
+  } catch (error) { next(error); }
+}
+
+export async function acceptUpsell(request, response, next) {
+  try {
+    const { suggestionProductId, quantity = 1, expectedLockVersion } = request.body ?? {};
+    if (!suggestionProductId) throw new AppError(422, 'MISSING_FIELD', 'suggestionProductId is required.');
+    const result = await inTransaction(async (client) => {
+      const quote = await quoteForAccess(client, request, request.validated.params.quoteId, true);
+      if (typeof expectedLockVersion === 'number' && quote.lock_version !== expectedLockVersion) {
+        throw new AppError(409, 'QUOTE_VERSION_CONFLICT', 'Quotation was updated by another user.');
+      }
+      if (['paid', 'cancelled', 'expired', 'superseded'].includes(quote.status)) {
+        throw new AppError(409, 'QUOTE_NOT_EDITABLE', 'This quotation cannot be revised.');
+      }
+      const customer = (await client.query(
+        `SELECT c.*, ct.code AS tier_code, COALESCE(ct.entitlement_discount_percent,0) AS entitlement_discount_percent,
+                ct.policy_version AS tier_policy_version
+         FROM customers c LEFT JOIN customer_tiers ct ON ct.id=c.tier_id WHERE c.id=$1`,
+        [quote.customer_id]
+      )).rows[0];
+      const version = (await client.query(
+        'SELECT * FROM quotation_versions WHERE quotation_id=$1 AND version_number=$2',
+        [quote.id, quote.current_version_number]
+      )).rows[0];
+      const existingLines = (await client.query(
+        `SELECT product_id, quantity, COALESCE(line_discount_percent,0) AS line_discount_percent, product_variant_id
+         FROM quotation_lines WHERE quotation_version_id=$1 ORDER BY line_number`,
+        [version.id]
+      )).rows;
+      if (existingLines.some(l => l.product_id === suggestionProductId)) {
+        throw new AppError(409, 'ALREADY_IN_QUOTE', 'This product is already on the quotation.');
+      }
+      const lines = [
+        ...existingLines.map(l => ({
+          productId: l.product_id,
+          productVariantId: l.product_variant_id ?? undefined,
+          quantity: parseFloat(l.quantity),
+          lineDiscountPercent: parseFloat(l.line_discount_percent),
+        })),
+        { productId: suggestionProductId, quantity: parseFloat(quantity), lineDiscountPercent: 0 },
+      ];
+      const nextVersion = quote.current_version_number + 1;
+      const { version: newVersion, assessment } = await createQuoteVersion(client, {
+        quotation: quote, customer,
+        input: { customerId: quote.customer_id, discountMode: 'line', currencyCode: version.currency_code, reason: 'Upsell accepted', lines },
+        actorUserId: request.principal.id,
+        versionNumber: nextVersion,
+      });
+      await client.query(
+        `UPDATE quotations SET current_version_number=$1, lock_version=lock_version+1, status='draft', last_activity_at=now(), updated_at=now() WHERE id=$2`,
+        [nextVersion, quote.id]
+      );
+      await client.query(
+        `UPDATE approval_instances SET status='superseded' WHERE quotation_id=$1 AND status='pending'`,
+        [quote.id]
+      );
+      await writeAuditAndOutbox(client, {
+        aggregateType: 'quotation', aggregateId: quote.id,
+        eventType: 'quotation.upsell_accepted',
+        actorUserId: request.principal.id,
+        metadata: { suggestionProductId, quantity, newVersion: nextVersion, grandTotal: newVersion.grand_total },
+      });
+      return { version: newVersion, assessment, lockVersion: quote.lock_version + 1 };
+    });
+    response.status(201).json({ data: result });
+  } catch (error) { next(error); }
+}
+
 export async function getDealHealth(request, response, next) {
   try {
     const quote = await quoteForAccess(pool, request, request.validated.params.quoteId);

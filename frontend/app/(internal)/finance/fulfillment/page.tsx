@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useRoleGuard } from '@/lib/useRoleGuard';
-import { PageHeader, Badge, Button, Card, Table, Tr, Td, InfoBanner } from '@/components/ui';
+import { PageHeader, Badge, Button, Card, Table, Tr, Td } from '@/components/ui';
 
 interface Quote {
   id: string;
@@ -200,11 +200,7 @@ export default function FinanceFulfillmentPage() {
         </Card>
       )}
 
-      <div className="mt-4">
-        <InfoBanner>
-          Allocate uses the system suggested warehouse split. Manual overrides are available via API. Backorder consolidation re-attempts allocation against current stock.
-        </InfoBanner>
-      </div>
+
     </div>
   );
 }

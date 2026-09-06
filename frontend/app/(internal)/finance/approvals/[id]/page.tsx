@@ -149,9 +149,6 @@ export default function FinanceApprovalDetailPage() {
         </>
       )}
 
-      <InfoBanner>
-        Finance decisions are final. Approval advances the quote to confirmed; rejection closes it. Return sends it back to the sales rep.
-      </InfoBanner>
 
       {actionResult ? (
         <div className="mt-6 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">

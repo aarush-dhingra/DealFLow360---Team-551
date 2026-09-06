@@ -38,6 +38,43 @@ export async function acceptQuote(userEmail, quotationId, lockVersion, customerI
       [quotationId]
     );
 
+    // Create invoice for one-time lines; recurring lines are billed on a separate schedule.
+    const { rows: versionRows } = await client.query(
+      `SELECT qv.id, qv.currency_code,
+              COALESCE(SUM(ql.net_line_value) FILTER (WHERE p.billing_kind = 'one_time'), 0) AS one_time_total,
+              COALESCE(SUM(ql.net_line_value) FILTER (WHERE p.billing_kind = 'recurring'), 0) AS recurring_total,
+              qv.grand_total
+       FROM quotation_versions qv
+       JOIN quotation_lines ql ON ql.quotation_version_id = qv.id
+       JOIN products p ON p.id = ql.product_id
+       WHERE qv.quotation_id = $1 AND qv.version_number = $2
+       GROUP BY qv.id, qv.currency_code, qv.grand_total`,
+      [quotationId, quote.current_version_number]
+    );
+    const ver = versionRows[0];
+    if (ver) {
+      const oneTimeAmt = parseFloat(ver.one_time_total);
+      const recurringAmt = parseFloat(ver.recurring_total);
+      const invoiceNumber = `INV-${Date.now()}-${quotationId.slice(0, 8).toUpperCase()}`;
+
+      if (oneTimeAmt > 0) {
+        await client.query(
+          `INSERT INTO invoices (invoice_number, quotation_id, customer_id, currency_code, amount_due, amount_paid, status, issued_at, due_at)
+           VALUES ($1, $2, $3, $4, $5, 0, 'issued', now(), now() + interval '30 days')`,
+          [invoiceNumber, quotationId, customerId, ver.currency_code, oneTimeAmt]
+        );
+      }
+
+      // Record a recurring billing event for the schedule if there are recurring lines
+      if (recurringAmt > 0) {
+        await client.query(
+          `INSERT INTO invoices (invoice_number, quotation_id, customer_id, currency_code, amount_due, amount_paid, status, issued_at, due_at)
+           VALUES ($1, $2, $3, $4, $5, 0, 'issued', now(), now() + interval '30 days')`,
+          [`${invoiceNumber}-REC`, quotationId, customerId, ver.currency_code, recurringAmt]
+        );
+      }
+    }
+
     await writeAuditAndOutbox(client, {
       aggregateType: 'quotation',
       aggregateId: quotationId,

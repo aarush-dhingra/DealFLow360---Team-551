@@ -15,7 +15,6 @@ const flatNavItems = [
   { label: 'Negotiations',  href: '/negotiations',          roles: ['sales_rep', 'sales_manager', 'finance_operations', 'admin'] },
   { label: 'Approvals',     href: '/approvals',             roles: ['sales_manager', 'admin'] },
   { label: 'Fulfillment',   href: '/fulfillment',           roles: ['finance_operations'] },
-  { label: 'Subscriptions', href: '/subscriptions',         roles: ['sales_manager'] },
   { label: 'Invoices',      href: '/invoices',              roles: ['finance_operations'] },
   { label: 'Quote Requests', href: '/quote-requests',       roles: ['sales_rep'] },
   { label: 'Deal Health',   href: '/deal-health',           roles: ['sales_manager'] },
@@ -33,7 +32,6 @@ const adminGroups = [
     label: 'Operations ▾',
     items: [
       { label: 'Fulfillment',    href: '/fulfillment' },
-      { label: 'Subscriptions',  href: '/subscriptions' },
       { label: 'Deal Health',    href: '/deal-health' },
       { label: 'Reports',        href: '/reports' },
     ],
@@ -51,10 +49,11 @@ const adminGroups = [
   {
     label: 'Config ▾',
     items: [
-      { label: 'Products',     href: '/products' },
-      { label: 'Users',        href: '/settings/users' },
-      { label: 'Tier Program', href: '/settings/tier-program' },
-      { label: 'Customers',    href: '/settings/customers' },
+      { label: 'Products',       href: '/products' },
+      { label: 'Users',          href: '/settings/users' },
+      { label: 'Tier Program',   href: '/settings/tier-program' },
+      { label: 'Customers',      href: '/settings/customers' },
+      { label: 'Subscriptions',  href: '/subscriptions' },
     ],
   },
 ];

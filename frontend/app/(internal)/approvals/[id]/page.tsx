@@ -142,9 +142,6 @@ export default function ApprovalDetailPage() {
         </>
       )}
 
-      <InfoBanner>
-        Blended risk is computed as line excess discount value / total pre-discount order value. One over-limit line can escalate the whole quote.
-      </InfoBanner>
 
       <div className="mt-6 mb-5">
         <PipelineStep steps={pipelineSteps} current={currentStep} />
