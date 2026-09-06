@@ -5,10 +5,9 @@
  * current version:
  *  - Only one-time (physical) lines are considered; recurring subscription
  *    lines are excluded by the caller before planning.
- *  - Minimize shipment count first: when a single warehouse can cover the whole
- *    remaining quantity, prefer it; among full-cover candidates pick the
- *    cheapest by shipping_cost_weight.
- *  - Otherwise split cheapest-first across warehouses; never allocate more than
+ *  - Minimize the total warehouse shipment charge first. Fewer shipments are a
+ *    tie-breaker, never a reason to charge the customer more.
+ *  - Otherwise split lowest incremental-cost first; never allocate more than
  *    a warehouse's available stock (on_hand - reserved).
  *  - What cannot be covered becomes a backorder allocation row (status
  *    'backordered'); a backorder reserves nothing.
@@ -59,6 +58,37 @@ function cheapestByWeight(warehouses) {
   });
 }
 
+function requiredByProduct(lines) {
+  const required = new Map();
+  for (const line of lines) required.set(line.productId, add(required.get(line.productId) ?? '0', line.quantity));
+  return required;
+}
+
+/**
+ * For the small operational warehouse set, evaluate every usable warehouse
+ * combination. This prevents a greedy first line from selecting a cheap
+ * warehouse that later forces a more expensive second shipment.
+ */
+function lowestCostFullCoverageSet(lines, availability, warehouses) {
+  if (warehouses.length > 15) return null;
+  const required = requiredByProduct(lines);
+  let best = null;
+  for (let mask = 1; mask < (1 << warehouses.length); mask += 1) {
+    const selected = warehouses.filter((_, index) => mask & (1 << index));
+    const covers = [...required].every(([productId, needed]) => {
+      let available = '0';
+      for (const warehouse of selected) available = add(available, availability.get(stockKey(warehouse.id, productId)) ?? '0');
+      return compare(available, needed) >= 0;
+    });
+    if (!covers) continue;
+    const cost = selected.reduce((total, warehouse) => add(total, warehouse.shippingCostWeight), '0');
+    if (!best || compare(cost, best.cost) < 0 || (compare(cost, best.cost) === 0 && selected.length < best.warehouses.length)) {
+      best = { warehouses: selected, cost };
+    }
+  }
+  return best;
+}
+
 /**
  * Suggested warehouse split for physical lines.
  *
@@ -74,36 +104,25 @@ export function suggestAllocations({ lines, inventory, warehouses }) {
   const availability = buildAvailabilityMap(inventory);
   const byCost = cheapestByWeight(warehouses);
   const allocations = [];
+  const fullyCoveringSet = lowestCostFullCoverageSet(lines, availability, byCost);
+  const selectedWarehouseIds = new Set();
 
   for (const line of lines) {
     let remaining = line.quantity;
 
     // Candidate warehouses with any stock for this product.
-    const candidates = byCost.filter((w) => {
+    const candidates = (fullyCoveringSet?.warehouses ?? byCost).filter((w) => {
       const avail = availability.get(stockKey(w.id, line.productId));
       return avail !== undefined && gt(avail, '0');
+    }).sort((a, b) => {
+      const existingA = selectedWarehouseIds.has(a.id) ? 0 : 1;
+      const existingB = selectedWarehouseIds.has(b.id) ? 0 : 1;
+      if (existingA !== existingB) return existingA - existingB;
+      return compare(a.shippingCostWeight, b.shippingCostWeight);
     });
 
-    // 1. Prefer a single warehouse that fully covers (minimal shipment count).
-    const fullCover = candidates.find((w) => {
-      const avail = availability.get(stockKey(w.id, line.productId));
-      return compare(avail, remaining) >= 0;
-    });
-
-    if (fullCover) {
-      const avail = availability.get(stockKey(fullCover.id, line.productId));
-      allocations.push({
-        quotationLineId: line.quotationLineId,
-        productId: line.productId,
-        warehouseId: fullCover.id,
-        quantity: remaining,
-        status: 'allocated'
-      });
-      availability.set(stockKey(fullCover.id, line.productId), subtract(avail, remaining));
-      continue;
-    }
-
-    // 2. Split cheapest-first across warehouses.
+    // Allocate from the selected lowest-cost warehouse set. When full coverage
+    // is impossible, avoid opening an extra warehouse unless it reduces cost.
     for (const warehouse of candidates) {
       if (!gt(remaining, '0')) break;
       const avail = availability.get(stockKey(warehouse.id, line.productId));
@@ -117,10 +136,11 @@ export function suggestAllocations({ lines, inventory, warehouses }) {
         status: 'allocated'
       });
       availability.set(stockKey(warehouse.id, line.productId), subtract(avail, take));
+      selectedWarehouseIds.add(warehouse.id);
       remaining = subtract(remaining, take);
     }
 
-    // 3. Anything left becomes a backorder (cheapest stocking warehouse as the
+    // Anything left becomes a backorder (cheapest stocking warehouse as the
     // expected source; backorder reserves nothing).
     if (gt(remaining, '0')) {
       allocations.push({

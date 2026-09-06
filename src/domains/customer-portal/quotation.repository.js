@@ -25,7 +25,7 @@ export async function listPortalBilling(userEmail) {
   const customerId = await resolveCustomerId(userEmail);
   if (!customerId) return [];
   const { rows } = await pool.query(
-    `SELECT i.id, i.invoice_number, i.status, i.currency_code, i.amount_due, i.amount_paid,
+    `SELECT i.id, i.invoice_number, i.status, i.currency_code, i.amount_due, i.amount_paid, i.shipping_amount,
             i.issued_at, i.due_at, q.quote_number,
             COALESCE(credits.applied_total, 0) AS applied_credit_total,
             GREATEST(i.amount_due - i.amount_paid - COALESCE(credits.applied_total, 0), 0) AS outstanding_balance,

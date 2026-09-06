@@ -16,7 +16,7 @@
  * override re-allocates the existing live order instead of creating a second.
  */
 
-import { withTransaction } from '../../../infrastructure/database/transaction.js';
+import { withTransaction, writeAuditAndOutbox } from '../../../infrastructure/database/transaction.js';
 import { AuditCollector } from '../../../infrastructure/events/audit.js';
 import { OutboxCollector } from '../../../infrastructure/events/outbox.js';
 import { Errors } from '../../../shared/errors.js';
@@ -169,6 +169,9 @@ export async function allocateFulfillment({ quotationId, mode, manualAllocations
       expectedLockVersion: quote.lockVersion
     });
     if (!advanced) throw Errors.staleVersion('Quotation changed concurrently; reload and retry.');
+    const invoice = hasBackorder ? null : await issueFulfillmentInvoice(client, {
+      orderId: created.id, quotationId, shippingAmount: plan.shippingCostTotal, principal
+    });
 
     await writeAudit(client, {
       quotationId,
@@ -177,7 +180,8 @@ export async function allocateFulfillment({ quotationId, mode, manualAllocations
       eventType: 'fulfillment.allocated',
       plan,
       quoteStatus: quote.status,
-      quoteStatusAfter
+      quoteStatusAfter,
+      invoice
     });
     return summarize(created.id, quote, plan, 'suggested', quoteStatusAfter);
   });
@@ -206,7 +210,7 @@ async function persistAllocations(client, fulfillmentOrderId, allocations) {
 
 async function writeAudit(
   client,
-  { quotationId, orderId, principal, eventType, plan, quoteStatus, quoteStatusAfter }
+  { quotationId, orderId, principal, eventType, plan, quoteStatus, quoteStatusAfter, invoice = null }
 ) {
   const audit = new AuditCollector(client);
   const outbox = new OutboxCollector(client);
@@ -219,7 +223,7 @@ async function writeAudit(
     requestId: principal.requestId ?? null,
     beforeState: { quoteStatus },
     afterState: { quoteStatus: quoteStatusAfter, allocationCount: plan.allocations.length },
-    metadata: { shipmentCount: plan.shipmentCount, shippingCostTotal: plan.shippingCostTotal }
+    metadata: { shipmentCount: plan.shipmentCount, shippingCostTotal: plan.shippingCostTotal, invoiceId: invoice?.id ?? null }
   });
   outbox.record({
     aggregateType: 'fulfillment_order',
@@ -230,12 +234,33 @@ async function writeAudit(
       orderId,
       quoteStatusAfter,
       hasBackorder: plan.allocations.some((a) => a.status === 'backordered'),
-      allocationCount: plan.allocations.length
+      allocationCount: plan.allocations.length,
+      invoiceId: invoice?.id ?? null
     }
   });
   await audit.flush();
   await outbox.flush();
   client.realtimeChanges?.push({ aggregateType: 'fulfillment_order', aggregateId: orderId, quotationId, eventType });
+}
+
+async function issueFulfillmentInvoice(client, { orderId, quotationId, shippingAmount, principal }) {
+  const existing = await repo.findFulfillmentInvoice(client, orderId);
+  if (existing) return existing;
+  const billable = await repo.findBillableQuote(client, quotationId);
+  if (!billable) return null;
+  const invoice = await repo.insertFulfillmentInvoice(client, {
+    fulfillmentOrderId: orderId,
+    quotationId,
+    customerId: billable.customerId,
+    currencyCode: billable.currencyCode,
+    goodsAmount: billable.goodsAmount,
+    shippingAmount
+  });
+  await writeAuditAndOutbox(client, {
+    aggregateType: 'invoice', aggregateId: invoice.id, eventType: 'invoice.issued_from_fulfillment', actorUserId: principal.userId,
+    afterState: invoice, metadata: { quotationId, fulfillmentOrderId: orderId, goodsAmount: billable.goodsAmount, shippingAmount }
+  });
+  return invoice;
 }
 
 /**
@@ -373,6 +398,14 @@ export async function consolidateBackorders({ quotationId, principal }) {
       status: orderStatus,
       allocationMode: order.allocationMode
     });
+    const invoice = backorders.length === 0
+      ? await issueFulfillmentInvoice(client, {
+        orderId: order.id,
+        quotationId,
+        shippingAmount: await repo.findOrderShippingTotal(client, order.id),
+        principal
+      })
+      : null;
 
     const audit = new AuditCollector(client);
     const outbox = new OutboxCollector(client);
@@ -386,13 +419,13 @@ export async function consolidateBackorders({ quotationId, principal }) {
       requestId: principal.requestId ?? null,
       beforeState: { orderStatus: 'backordered' },
       afterState: { orderStatus, consolidatedQty, consolidatedRows, remainingBackorders: backorders.length },
-      metadata: { at: now }
+      metadata: { at: now, invoiceId: invoice?.id ?? null }
     });
     outbox.record({
       aggregateType: 'fulfillment_order',
       aggregateId: order.id,
       eventType: 'fulfillment.backorder_consolidated',
-      payload: { quotationId, orderId: order.id, consolidatedQty, consolidatedRows, orderStatus, at: now }
+      payload: { quotationId, orderId: order.id, consolidatedQty, consolidatedRows, orderStatus, at: now, invoiceId: invoice?.id ?? null }
     });
     await audit.flush();
     await outbox.flush();

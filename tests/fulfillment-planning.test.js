@@ -47,6 +47,29 @@ test('fulfillment: split cheapest-first when no single warehouse covers', () => 
   assert.equal(plan.shippingCostTotal, '30.0000');
 });
 
+test('fulfillment: lower total shipping cost wins over fewer shipments', () => {
+  const plan = suggestAllocations({
+    lines: [
+      { quotationLineId: 'l1', productId: 'p1', quantity: '4' },
+      { quotationLineId: 'l2', productId: 'p2', quantity: '4' }
+    ],
+    inventory: [
+      { warehouseId: 'wh-main', productId: 'p1', quantityOnHand: '4', quantityReserved: '0' },
+      { warehouseId: 'wh-east', productId: 'p2', quantityOnHand: '4', quantityReserved: '0' },
+      { warehouseId: 'wh-all', productId: 'p1', quantityOnHand: '4', quantityReserved: '0' },
+      { warehouseId: 'wh-all', productId: 'p2', quantityOnHand: '4', quantityReserved: '0' }
+    ],
+    warehouses: [
+      { id: 'wh-main', shippingCostWeight: '3' },
+      { id: 'wh-east', shippingCostWeight: '4' },
+      { id: 'wh-all', shippingCostWeight: '10' }
+    ]
+  });
+  assert.equal(plan.shipmentCount, 2);
+  assert.equal(plan.shippingCostTotal, '7.0000');
+  assert.deepEqual(new Set(plan.allocations.map((allocation) => allocation.warehouseId)), new Set(['wh-main', 'wh-east']));
+});
+
 test('fulfillment: shortfall becomes a backorder that reserves nothing', () => {
   const plan = suggestAllocations({
     lines: [{ quotationLineId: 'l1', productId: 'p1', quantity: '12' }],

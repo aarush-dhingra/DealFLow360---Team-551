@@ -38,7 +38,9 @@ export async function acceptQuote(userEmail, quotationId, lockVersion, customerI
       [quotationId]
     );
 
-    // Create invoice for one-time lines; recurring lines are billed on a separate schedule.
+    // One-time goods are invoiced only after Finance selects the warehouse split,
+    // because that invoice includes the actual shipment cost. Recurring lines
+    // keep their separate billing path until the subscription scheduler replaces it.
     const { rows: versionRows } = await client.query(
       `SELECT qv.id, qv.currency_code,
               COALESCE(SUM(ql.net_line_value) FILTER (WHERE p.billing_kind = 'one_time'), 0) AS one_time_total,
@@ -53,19 +55,11 @@ export async function acceptQuote(userEmail, quotationId, lockVersion, customerI
     );
     const ver = versionRows[0];
     if (ver) {
-      const oneTimeAmt = parseFloat(ver.one_time_total);
       const recurringAmt = parseFloat(ver.recurring_total);
       const invoiceNumber = `INV-${Date.now()}-${quotationId.slice(0, 8).toUpperCase()}`;
 
-      if (oneTimeAmt > 0) {
-        await client.query(
-          `INSERT INTO invoices (invoice_number, quotation_id, customer_id, currency_code, amount_due, amount_paid, status, issued_at, due_at)
-           VALUES ($1, $2, $3, $4, $5, 0, 'issued', now(), now() + interval '30 days')`,
-          [invoiceNumber, quotationId, customerId, ver.currency_code, oneTimeAmt]
-        );
-      }
-
-      // Record a recurring billing event for the schedule if there are recurring lines
+      // The one-time total is intentionally not invoiced here. Finance creates
+      // the fulfillment invoice after allocation, with the shipping amount.
       if (recurringAmt > 0) {
         await client.query(
           `INSERT INTO invoices (invoice_number, quotation_id, customer_id, currency_code, amount_due, amount_paid, status, issued_at, due_at)

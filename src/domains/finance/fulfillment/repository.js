@@ -192,6 +192,26 @@ const CANCEL_ALLOCATION = `
   RETURNING id
 `;
 
+const SELECT_BILLABLE_QUOTE = `
+  SELECT q.customer_id AS "customerId", qv.currency_code AS "currencyCode",
+         COALESCE(SUM(ql.net_line_value), 0) AS "goodsAmount"
+  FROM quotations q
+  JOIN quotation_versions qv ON qv.quotation_id=q.id AND qv.version_number=q.current_version_number
+  JOIN quotation_lines ql ON ql.quotation_version_id=qv.id
+  JOIN products p ON p.id=ql.product_id AND p.billing_kind='one_time'
+  WHERE q.id=$1
+  GROUP BY q.customer_id,qv.currency_code
+`;
+
+const SELECT_FULFILLMENT_INVOICE = `SELECT id FROM invoices WHERE fulfillment_order_id=$1`;
+
+const SELECT_ORDER_SHIPPING_TOTAL = `
+  SELECT COALESCE(SUM(w.shipping_cost_weight), 0) AS "shippingCostTotal"
+  FROM warehouses w
+  JOIN (SELECT DISTINCT warehouse_id FROM fulfillment_allocations WHERE fulfillment_order_id=$1 AND status='allocated') used
+    ON used.warehouse_id=w.id
+`;
+
 const MARK_ALLOCATIONS_SHIPPED = `
   UPDATE fulfillment_allocations
   SET status='shipped'
@@ -294,6 +314,32 @@ export async function findOrderAllocations(client, fulfillmentOrderId) {
 export async function cancelAllocation(client, allocationId) {
   const { rows } = await client.query(CANCEL_ALLOCATION, [allocationId]);
   return rows[0] ?? null;
+}
+
+export async function findBillableQuote(client, quotationId) {
+  const { rows } = await client.query(SELECT_BILLABLE_QUOTE, [quotationId]);
+  return rows[0] ?? null;
+}
+
+export async function findFulfillmentInvoice(client, fulfillmentOrderId) {
+  const { rows } = await client.query(SELECT_FULFILLMENT_INVOICE, [fulfillmentOrderId]);
+  return rows[0] ?? null;
+}
+
+export async function findOrderShippingTotal(client, fulfillmentOrderId) {
+  const { rows } = await client.query(SELECT_ORDER_SHIPPING_TOTAL, [fulfillmentOrderId]);
+  return rows[0]?.shippingCostTotal ?? '0';
+}
+
+export async function insertFulfillmentInvoice(client, { fulfillmentOrderId, quotationId, customerId, currencyCode, goodsAmount, shippingAmount }) {
+  const invoiceNumber = `INV-${Date.now()}-${quotationId.slice(0, 8).toUpperCase()}-FUL`;
+  const { rows } = await client.query(
+    `INSERT INTO invoices(invoice_number,quotation_id,fulfillment_order_id,customer_id,currency_code,amount_due,amount_paid,shipping_amount,status,issued_at,due_at)
+     VALUES($1,$2,$3,$4,$5,$6+$7,0,$7,'issued',now(),now()+interval '30 days')
+     RETURNING id,invoice_number AS "invoiceNumber",amount_due AS "amountDue",shipping_amount AS "shippingAmount",currency_code AS "currencyCode",status`,
+    [invoiceNumber, quotationId, fulfillmentOrderId, customerId, currencyCode, goodsAmount, shippingAmount]
+  );
+  return rows[0];
 }
 
 export async function markAllocationsShipped(client, fulfillmentOrderId) {
