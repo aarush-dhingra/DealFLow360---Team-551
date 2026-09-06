@@ -1,7 +1,7 @@
 import { pool } from '../../../infrastructure/database/pool.js';
 import { inTransaction, writeAuditAndOutbox } from '../../../infrastructure/database/transaction.js';
 import { AppError } from '../../../shared/http.js';
-import { createQuoteVersion, routeApproval } from '../../../domains/sales-rep/quotation.service.js';
+import { createQuoteVersion } from '../../../domains/sales-rep/quotation.service.js';
 import { getQuotationById } from '../../../domains/quotations/repository.js';
 
 const editableRole = (principal, role) => principal.roles.includes('admin') || principal.roles.includes(role);
