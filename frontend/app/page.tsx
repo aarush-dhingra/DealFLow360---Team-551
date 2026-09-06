@@ -84,6 +84,7 @@ export default function LoginPage() {
 
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault();
+    if (!validatePassword(newPassword)) return;
     if (newPassword !== confirmPassword) { setError('Passwords do not match.'); return; }
     setLoading(true); setError('');
     try {
@@ -147,12 +148,16 @@ export default function LoginPage() {
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">New Password</label>
                   <div className="relative">
-                    <input type={showNew ? 'text' : 'password'} required minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min. 8 characters"
-                      className="w-full px-3 py-2 pr-10 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
+                    <input type={showNew ? 'text' : 'password'} required minLength={6} value={newPassword}
+                      onChange={(e) => { setNewPassword(e.target.value); if (passErr) validatePassword(e.target.value); }}
+                      onBlur={(e) => validatePassword(e.target.value)}
+                      placeholder="Min. 6 chars, uppercase, lowercase, symbol"
+                      className={`w-full px-3 py-2 pr-10 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-brand ${passErr ? 'border-red-400 focus:ring-red-300' : 'border-gray-300'}`} />
                     <button type="button" onClick={() => setShowNew(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                       {showNew ? <EyeOff /> : <Eye />}
                     </button>
                   </div>
+                  {passErr && <p className="mt-1 text-xs text-red-500">{passErr}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Confirm Password</label>
