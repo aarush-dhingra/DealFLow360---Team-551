@@ -18,8 +18,11 @@ interface QuoteRow {
   blended_risk_percent: string | null;
   route: BackendApprovalRoute | null;
   owner_user_id: string;
+  owner_name?: string | null;
   negotiation_owner_role?: 'sales_rep' | 'sales_manager' | 'finance_operations' | null;
   negotiation_case_status?: 'open' | 'forwarded' | 'resolved' | null;
+  last_handoff_reason?: string | null;
+  negotiation_updated_at?: string | null;
 }
 
 const STATUS_DISPLAY: Record<string, string> = {
@@ -95,7 +98,7 @@ export default function QuotationsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <PageHeader title="Quotations" subtitle="Every quotation in the system - click a row to open it" />
+        <PageHeader title="Quotations" subtitle={viewerSubtitle(isFinance ? 'finance_operations' : isManager ? 'sales_manager' : 'sales_rep')} />
         <div className="flex items-center gap-2">
           {(userRoles.includes('sales_rep') || userRoles.includes('admin')) && (
             <Button variant="primary" onClick={() => router.push('/quotations/new')}>+ New Quotation</Button>
@@ -154,7 +157,8 @@ function KanbanView({ quotes: initialQuotes, viewerRole, onOpen }: { quotes: Quo
   }
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
+    <div className="max-w-full overflow-x-auto pb-4">
+      <div className="grid min-w-max grid-flow-col auto-cols-[240px] gap-4">
       {(viewerRole === 'sales_rep' ? KANBAN_COLS.filter((status) => status !== 'forwarded') : KANBAN_COLS).map((status) => {
         const cards = quotes.filter((q) => {
           if (status === 'escalated') {
@@ -169,7 +173,7 @@ function KanbanView({ quotes: initialQuotes, viewerRole, onOpen }: { quotes: Quo
         return (
           <div
             key={status}
-            className={`min-w-[200px] w-52 shrink-0 rounded-xl transition-colors ${isDropTarget && dragOver === status ? 'bg-brand-50 ring-2 ring-brand ring-offset-1' : ''}`}
+            className={`w-[240px] rounded-xl transition-colors ${isDropTarget && dragOver === status ? 'bg-brand-50 ring-2 ring-brand ring-offset-1' : ''}`}
             onDragOver={(e) => { if (isDropTarget) { e.preventDefault(); setDragOver(status); } }}
             onDragLeave={() => setDragOver(null)}
             onDrop={() => handleDrop(status)}
@@ -194,9 +198,15 @@ function KanbanView({ quotes: initialQuotes, viewerRole, onOpen }: { quotes: Quo
                     className="w-full"
                   >
                     <p className="text-sm font-medium text-gray-900">{q.customer_name ?? q.legal_name ?? 'Customer unavailable'}</p>
+                    <p className="mt-1 text-xs text-gray-500">{q.quote_number}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
                       ${q.grand_total ? parseFloat(q.grand_total).toLocaleString() : '-'}
                     </p>
+                    <div className="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-500 space-y-1">
+                      <p>Sales rep: <span className="font-medium text-gray-700">{q.owner_name ?? 'Unassigned'}</span></p>
+                      {q.negotiation_owner_role && <p>Now with: <span className="font-medium text-gray-700">{ownerLabel(q.negotiation_owner_role)}</span></p>}
+                      {q.last_handoff_reason && <p className="line-clamp-2">Reason: {q.last_handoff_reason}</p>}
+                    </div>
                     {q.route && q.route !== 'none' && (
                       <div className="mt-1.5">
                         <RiskBadge risk={routeToRisk(q.route)} />
@@ -216,6 +226,7 @@ function KanbanView({ quotes: initialQuotes, viewerRole, onOpen }: { quotes: Quo
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -227,7 +238,7 @@ function TableView({ quotes, onOpen }: { quotes: QuoteRow[]; onOpen: (id: string
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              {['Quote #', 'Customer', 'Amount', 'Status', 'Risk'].map((h) => (
+              {['Quote #', 'Customer', 'Sales rep', 'Current owner', 'Amount', 'Status', 'Risk'].map((h) => (
                 <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -237,6 +248,8 @@ function TableView({ quotes, onOpen }: { quotes: QuoteRow[]; onOpen: (id: string
               <tr key={q.id} onClick={() => onOpen(q.id)} className="cursor-pointer hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-3 font-medium text-brand">{q.quote_number}</td>
                 <td className="px-4 py-3 text-gray-900">{q.customer_name ?? q.legal_name ?? 'Customer unavailable'}</td>
+                <td className="px-4 py-3 text-gray-600">{q.owner_name ?? 'Unassigned'}</td>
+                <td className="px-4 py-3 text-gray-600">{q.negotiation_owner_role ? ownerLabel(q.negotiation_owner_role) : 'Sales rep'}</td>
                 <td className="px-4 py-3 text-gray-700">
                   ${q.grand_total ? parseFloat(q.grand_total).toLocaleString() : '-'}
                 </td>
@@ -249,11 +262,21 @@ function TableView({ quotes, onOpen }: { quotes: QuoteRow[]; onOpen: (id: string
               </tr>
             ))}
             {quotes.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No quotations yet</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No quotations yet</td></tr>
             )}
           </tbody>
         </table>
       </div>
     </Card>
   );
+}
+
+function ownerLabel(role: string) {
+  return role === 'sales_manager' ? 'Sales Manager' : role === 'finance_operations' ? 'Finance' : 'Sales Rep';
+}
+
+function viewerSubtitle(role: string) {
+  if (role === 'finance_operations') return 'Quotes waiting for Finance review or negotiation.';
+  if (role === 'sales_manager') return 'Manager-owned negotiations and formal approval work.';
+  return 'Your quotations, customer negotiations, and escalated handoffs.';
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { PageHeader, Button, Card, Badge } from '@/components/ui';
 
@@ -42,6 +42,9 @@ interface UpsellSuggestion {
 
 export default function NewQuotationPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const quoteRequestId = searchParams.get('requestId');
+  const requestedCustomerId = searchParams.get('customerId');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [customerId, setCustomerId] = useState('');
@@ -59,6 +62,12 @@ export default function NewQuotationPage() {
       .then((r) => setProducts(Array.isArray(r.data) ? r.data : []))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (requestedCustomerId && customers.some((customer) => customer.id === requestedCustomerId)) {
+      setCustomerId(requestedCustomerId);
+    }
+  }, [requestedCustomerId, customers]);
 
   useEffect(() => {
     if (lines.length === 0) { setSuggestions([]); return; }
@@ -114,6 +123,7 @@ export default function NewQuotationPage() {
     try {
       const body = {
         customerId,
+        ...(quoteRequestId ? { quoteRequestId } : {}),
         discountMode: 'line',
         currencyCode: 'USD',
         reason: 'Initial quotation',
@@ -135,7 +145,7 @@ export default function NewQuotationPage() {
   return (
     <div className="max-w-4xl">
       <button onClick={() => router.back()} className="text-sm text-gray-400 hover:text-gray-600 mb-2">← Back</button>
-      <PageHeader title="New Quotation" subtitle="Pick a customer, add products and discounts, then save or submit." />
+      <PageHeader title="New Quotation" subtitle={quoteRequestId ? 'Build the initial offer for this assigned customer request.' : 'Pick a customer, add products and discounts, then save or submit.'} />
 
       <div className="grid grid-cols-2 gap-4 mb-5">
         <div>

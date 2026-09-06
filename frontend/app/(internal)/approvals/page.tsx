@@ -39,7 +39,7 @@ export default function ApprovalsPage() {
   const [approvals, setApprovals] = useState<ApprovalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<Filter>('pending');
   const [negotiations, setNegotiations] = useState<NegotiationRow[]>([]);
 
   const isAdmin = getUser()?.roles?.includes('admin') ?? false;
@@ -70,7 +70,7 @@ export default function ApprovalsPage() {
 
   return (
     <div>
-      <PageHeader title="Approvals" subtitle="Every quotation that needed, needs, or has gone through discount approval" />
+      <PageHeader title="Approvals" subtitle="Formal approval decisions. Open customer negotiations are kept separately below." />
 
       <div className="flex items-center gap-2 mb-5 flex-wrap">
         {([

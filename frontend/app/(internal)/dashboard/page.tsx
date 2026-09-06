@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, getUser } from '@/lib/api';
 import { PageHeader, StatCard, Card } from '@/components/ui';
+import { useLiveUpdates } from '@/lib/useLiveUpdates';
 
 export default function DashboardPage() {
   const [pendingApprovals, setPendingApprovals] = useState<number | null>(null);
@@ -14,6 +15,8 @@ export default function DashboardPage() {
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [rolesLoaded, setRolesLoaded] = useState(false);
   const [quotesBreakdown, setQuotesBreakdown] = useState<Record<string, number> | null>(null);
+  const [openNegotiations, setOpenNegotiations] = useState<number | null>(null);
+  const [quoteRequests, setQuoteRequests] = useState<number | null>(null);
 
   useEffect(() => {
     const u = getUser();
@@ -28,7 +31,7 @@ export default function DashboardPage() {
   const isFinance = userRoles.includes('finance_operations') && !isAdmin;
   const isSalesRep = userRoles.includes('sales_rep') && !isAdmin && !isManager;
 
-  useEffect(() => {
+  const loadDashboard = useCallback(() => {
     if (!rolesLoaded) return;
 
     if (isManager) {
@@ -39,6 +42,10 @@ export default function DashboardPage() {
       api.get<{ quotations: unknown[]; count: number }>('/manager/quotations')
         .then((r) => setOpenQuotations(r.count ?? r.quotations?.length ?? 0))
         .catch(() => setOpenQuotations(0));
+
+      api.get<{ cases: unknown[] }>('/negotiations')
+        .then((r) => setOpenNegotiations(r.cases?.length ?? 0))
+        .catch(() => setOpenNegotiations(0));
 
       api.get<{ stalled_deals: unknown[]; discount_anomalies: unknown[] }>('/manager/deal-health/dashboard')
         .then((r) => {
@@ -62,6 +69,9 @@ export default function DashboardPage() {
           setPendingInvoices(unpaid.length);
         })
         .catch(() => setPendingInvoices(0));
+      api.get<{ cases: unknown[] }>('/negotiations')
+        .then((r) => setOpenNegotiations(r.cases?.length ?? 0))
+        .catch(() => setOpenNegotiations(0));
     } else if (isSalesRep) {
       api.get<{ data: Array<{ status: string }> }>('/sales-rep/quotations')
         .then((r) => {
@@ -72,8 +82,16 @@ export default function DashboardPage() {
           setQuotesBreakdown(breakdown);
         })
         .catch(() => setQuotesBreakdown({}));
+      api.get<{ cases: unknown[] }>('/negotiations')
+        .then((r) => setOpenNegotiations(r.cases?.length ?? 0))
+        .catch(() => setOpenNegotiations(0));
+      api.get<{ requests: unknown[] }>('/sales-rep/quotations/requests')
+        .then((r) => setQuoteRequests(r.requests?.filter((item: unknown) => (item as { status?: string }).status !== 'converted').length ?? 0))
+        .catch(() => setQuoteRequests(0));
     }
   }, [rolesLoaded, isManager, isFinance, isSalesRep]);
+  useEffect(() => { loadDashboard(); }, [loadDashboard]);
+  useLiveUpdates(loadDashboard);
 
   return (
     <div>
@@ -88,6 +106,9 @@ export default function DashboardPage() {
             <Link href="/quotations">
               <StatCard label="Open Quotations" value={openQuotations ?? '…'} sub="active deals in pipeline" />
             </Link>
+            <Link href="/negotiations">
+              <StatCard label="Open Negotiations" value={openNegotiations ?? '…'} sub="customer requests needing a manager" />
+            </Link>
             <Link href="/deal-health">
               <StatCard label="At-Risk Deals" value={atRisk ?? '…'} sub="stalled or anomalous discounts" />
             </Link>
@@ -100,6 +121,9 @@ export default function DashboardPage() {
             </Link>
             <Link href="/invoices">
               <StatCard label="Unpaid Invoices" value={pendingInvoices ?? '…'} sub="awaiting payment or action" />
+            </Link>
+            <Link href="/negotiations">
+              <StatCard label="Finance Negotiations" value={openNegotiations ?? '…'} sub="manager handoffs to continue" />
             </Link>
           </>
         )}
@@ -120,6 +144,8 @@ export default function DashboardPage() {
                 />
               </Link>
             ))}
+            <Link href="/negotiations"><StatCard label="Open Negotiations" value={openNegotiations ?? '…'} sub="your active customer requests" /></Link>
+            <Link href="/quote-requests"><StatCard label="Quote Requests" value={quoteRequests ?? '…'} sub="awaiting an initial offer" /></Link>
           </>
         )}
       </div>

@@ -149,13 +149,13 @@ export default function TopNav() {
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="flex items-center h-14 px-4 gap-1">
+      <div className="flex min-w-0 items-center h-14 px-4 gap-1">
         <Link href="/dashboard" className="mr-4 shrink-0 flex items-center gap-2">
           <Image src="/logo-256.png" alt="DealFlow360" width={28} height={28} className="rounded" priority />
           <span className="font-semibold text-base text-gray-900">DealFlow<span className="text-brand">360</span></span>
         </Link>
 
-        <nav className="flex items-center gap-0.5">
+        <nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto py-1">
           {visibleFlat.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + '/');
             return (

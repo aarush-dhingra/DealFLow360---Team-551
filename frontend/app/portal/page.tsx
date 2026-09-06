@@ -16,6 +16,7 @@ type Quote = {
   lock_version?: number;
   negotiation_owner_role?: string | null;
   negotiation_handoff_at?: string | null;
+  assigned_sales_rep_name?: string | null;
 };
 
 type Line = { id: string; product_name: string; quantity: string; net_line_value: string };
@@ -44,7 +45,7 @@ type NegotiationRequest = {
   line_requests: Array<{ line_id: string; product_name: string; comment: string }>;
 };
 
-type QuoteRequest = { id: string; message: string; status: string; created_at: string };
+type QuoteRequest = { id: string; message: string; status: string; created_at: string; assigned_sales_rep_name?: string | null; quote_number?: string | null; quotation_id?: string | null };
 type TierProgress = {
   tier_code?: string;
   tier_name?: string;
@@ -112,12 +113,15 @@ export default function CustomerPortalHome() {
   }, [router, loadQuotes]);
 
   useLiveUpdates(loadQuotes);
+  useLiveUpdates(loadRequests);
+
+  const hasOpenNegotiation = (quote: Quote | Detail) => Boolean(quote.negotiation_owner_role);
 
   const visible = useMemo(() =>
     quotes.filter((q) =>
       tab === 'completed' ? COMPLETE.has(q.status) :
-      tab === 'negotiations' ? q.status === 'under_negotiation' :
-      !COMPLETE.has(q.status) && q.status !== 'under_negotiation'
+      tab === 'negotiations' ? hasOpenNegotiation(q) :
+      !COMPLETE.has(q.status) && !hasOpenNegotiation(q)
     ),
     [quotes, tab]
   );
@@ -183,7 +187,7 @@ export default function CustomerPortalHome() {
     try {
       await api.post('/portal/quote-requests', { message: requestMsg });
       setRequestMsg('');
-      setRequestDone('Request sent! A sales rep will reach out with a quotation.');
+      setRequestDone('Request sent. Your assigned sales representative will prepare an initial offer.');
       loadRequests();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not send request.');
@@ -192,7 +196,7 @@ export default function CustomerPortalHome() {
     }
   }
 
-  const canNegotiate = selected && !COMPLETE.has(selected.status) &&
+  const canNegotiate = selected && !hasOpenNegotiation(selected) && !COMPLETE.has(selected.status) &&
     !['rejected', 'cancelled', 'customer_confirmed'].includes(selected.status);
 
   return (
@@ -287,6 +291,10 @@ export default function CustomerPortalHome() {
                           <p className="text-xs text-gray-400 mt-1">{new Date(r.created_at).toLocaleDateString()}</p>
                         </div>
                       </div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        {r.assigned_sales_rep_name ? `Assigned to ${r.assigned_sales_rep_name}` : 'Assigning a sales representative'}
+                        {r.quote_number ? ` · Quotation ${r.quote_number} created` : ''}
+                      </p>
                     </Card>
                   ))}
                 </div>
@@ -310,6 +318,7 @@ export default function CustomerPortalHome() {
                           <p className="text-sm text-gray-500 mt-1">
                             Last updated {new Date(q.last_activity_at).toLocaleDateString()}
                           </p>
+                          {q.assigned_sales_rep_name && <p className="mt-1 text-xs text-gray-500">Sales rep: {q.assigned_sales_rep_name}</p>}
                         </div>
                         <div className="text-right">
                           <Badge variant={q.status === 'under_negotiation' ? 'yellow' : COMPLETE.has(q.status) ? 'green' : 'blue'}>
@@ -398,6 +407,7 @@ export default function CustomerPortalHome() {
                   {selected.negotiation_owner_role && (
                     <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
                       Your negotiation is currently with <strong>{selected.negotiation_owner_role === 'sales_manager' ? 'a Sales Manager' : selected.negotiation_owner_role === 'finance_operations' ? 'Finance' : 'your Sales Representative'}</strong>.
+                      {selected.assigned_sales_rep_name && <span className="ml-1">Your assigned sales rep is <strong>{selected.assigned_sales_rep_name}</strong>.</span>}
                       {selected.negotiation_handoff_at && <span className="ml-1 text-xs text-blue-700">Updated {new Date(selected.negotiation_handoff_at).toLocaleString()}.</span>}
                     </div>
                   )}
@@ -450,6 +460,12 @@ export default function CustomerPortalHome() {
                           </Button>
                         )}
                       </div>
+                    </div>
+                  )}
+
+                  {selected.negotiation_owner_role && (
+                    <div className="border-t pt-4 px-3 py-2 bg-blue-50 rounded-lg text-sm text-blue-900">
+                      <span className="font-medium">Your request is being reviewed.</span> The current owner will send a revised offer here when it is ready.
                     </div>
                   )}
 

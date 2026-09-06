@@ -1,17 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { PageHeader, Badge, Card, Table, Tr, Td } from '@/components/ui';
+import { useLiveUpdates } from '@/lib/useLiveUpdates';
+import { PageHeader, Badge, Button, Card, Table, Tr, Td } from '@/components/ui';
 
 interface QuoteRequest {
   id: string;
+  customer_id: string;
   message: string;
   status: 'pending' | 'viewed' | 'converted';
   created_at: string;
   contact_name: string;
   contact_email: string;
   customer_name: string;
+  quotation_id?: string | null;
+  quote_number?: string | null;
 }
 
 const STATUS_VARIANT: Record<string, 'yellow' | 'green' | 'gray'> = {
@@ -21,16 +26,20 @@ const STATUS_VARIANT: Record<string, 'yellow' | 'green' | 'gray'> = {
 };
 
 export default function QuoteRequestsPage() {
+  const router = useRouter();
   const [requests, setRequests] = useState<QuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
     api.get<{ requests: QuoteRequest[] }>('/sales-rep/quotations/requests')
       .then((r) => setRequests(r.requests))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+  useEffect(() => { load(); }, [load]);
+  useLiveUpdates(load);
 
   return (
     <div className="max-w-5xl">
@@ -51,7 +60,7 @@ export default function QuoteRequestsPage() {
         <div className="text-sm text-gray-400 py-12 text-center">No quote requests yet.</div>
       ) : (
         <Card>
-          <Table headers={['Customer', 'Contact', 'Message', 'Status', 'Received']}>
+          <Table headers={['Customer', 'Contact', 'Message', 'Status', 'Received', 'Action']}>
             {requests.map((r) => (
               <Tr key={r.id}>
                 <Td className="font-medium">{r.customer_name}</Td>
@@ -69,6 +78,17 @@ export default function QuoteRequestsPage() {
                 </Td>
                 <Td className="text-gray-400 text-sm whitespace-nowrap">
                   {new Date(r.created_at).toLocaleDateString()}
+                </Td>
+                <Td>
+                  {r.quotation_id ? (
+                    <button onClick={() => router.push(`/quotations/${r.quotation_id}`)} className="text-sm text-brand hover:underline">
+                      {r.quote_number ?? 'View quotation'}
+                    </button>
+                  ) : (
+                    <Button variant="primary" onClick={() => router.push(`/quotations/new?requestId=${r.id}&customerId=${r.customer_id}`)}>
+                      Create quotation
+                    </Button>
+                  )}
                 </Td>
               </Tr>
             ))}
