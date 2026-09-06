@@ -24,14 +24,16 @@ export async function listQuotations({ status, ownerId, customerId, limit = 50, 
     `SELECT
        q.id, q.quote_number, q.status, q.current_version_number,
        q.opened_at, q.last_activity_at,
+       nc.owner_role AS negotiation_owner_role, nc.status AS negotiation_case_status,
        c.id AS customer_id, c.legal_name AS customer_name,
        u.id AS owner_id, u.display_name AS owner_name,
        qv.pre_discount_total, qv.net_total, qv.grand_total, qv.currency_code
      FROM quotations q
      JOIN customers c ON c.id = q.customer_id
-     JOIN users u ON u.id = q.owner_user_id
+     LEFT JOIN users u ON u.id = q.owner_user_id
      LEFT JOIN quotation_versions qv
        ON qv.quotation_id = q.id AND qv.version_number = q.current_version_number
+     LEFT JOIN negotiation_cases nc ON nc.quotation_id = q.id
      ${where}
      ORDER BY q.last_activity_at DESC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -47,11 +49,13 @@ export async function getQuotationById(id) {
        q.opened_at, q.last_activity_at, q.closed_at,
        c.id AS customer_id, c.legal_name AS customer_name,
        ct.code AS customer_tier, ct.entitlement_discount_percent AS tier_entitlement_percent,
-       u.id AS owner_id, u.display_name AS owner_name
+       u.id AS owner_id, u.display_name AS owner_name,
+       nc.owner_role AS negotiation_owner_role, nc.status AS negotiation_case_status
      FROM quotations q
      JOIN customers c ON c.id = q.customer_id
      LEFT JOIN customer_tiers ct ON ct.id = c.tier_id
-     JOIN users u ON u.id = q.owner_user_id
+     LEFT JOIN users u ON u.id = q.owner_user_id
+     LEFT JOIN negotiation_cases nc ON nc.quotation_id = q.id
      WHERE q.id = $1`,
     [id]
   );

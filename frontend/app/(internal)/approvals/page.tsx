@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, getUser } from '@/lib/api';
 import { useRoleGuard } from '@/lib/useRoleGuard';
@@ -43,7 +43,7 @@ export default function ApprovalsPage() {
 
   const isAdmin = getUser()?.roles?.includes('admin') ?? false;
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api.get<{ approvals: ApprovalRow[]; count: number }>('/manager/approvals')
       .then((res) => {
         const all = res.approvals;
@@ -52,8 +52,16 @@ export default function ApprovalsPage() {
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
+    api.get<{cases:NegotiationRow[]}>('/negotiations').then(r => setNegotiations(r.cases)).catch(() => {});
   }, [isAdmin]);
-  useEffect(() => { api.get<{cases:NegotiationRow[]}>('/negotiations').then(r=>setNegotiations(r.cases)).catch(()=>{}); }, []);
+  useEffect(() => {
+    load();
+    const refresh = () => { if (document.visibilityState === 'visible') load(); };
+    const interval = window.setInterval(refresh, 10_000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { window.clearInterval(interval); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
+  }, [load]);
 
   const pending  = approvals.filter((a) => a.status === 'pending');
   const returned = approvals.filter((a) => a.status === 'returned_for_revision');

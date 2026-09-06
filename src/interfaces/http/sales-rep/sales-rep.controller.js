@@ -30,12 +30,14 @@ export async function listQuotations(request, response, next) {
   try {
     const internalUser = request.principal.roles.some((role) => INTERNAL_ROLES.includes(role));
     const { rows } = await pool.query(
-      `SELECT q.*, c.legal_name, qv.grand_total, ra.blended_risk_percent, ra.route
+      `SELECT q.*, c.legal_name, qv.grand_total, ra.blended_risk_percent, ra.route,
+              nc.owner_role AS negotiation_owner_role, nc.status AS negotiation_case_status
        FROM quotations q
        JOIN customers c ON c.id = q.customer_id
        LEFT JOIN quotation_versions qv ON qv.quotation_id = q.id
          AND qv.version_number = q.current_version_number
        LEFT JOIN risk_assessments ra ON ra.quotation_version_id = qv.id
+       LEFT JOIN negotiation_cases nc ON nc.quotation_id = q.id
        WHERE ($1::boolean OR q.owner_user_id = $2)
        ORDER BY q.updated_at DESC`,
       [internalUser, request.principal.id]

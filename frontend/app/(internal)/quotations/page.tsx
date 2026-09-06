@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, getUser } from '@/lib/api';
 
@@ -17,6 +17,8 @@ interface QuoteRow {
   blended_risk_percent: string | null;
   route: BackendApprovalRoute | null;
   owner_user_id: string;
+  negotiation_owner_role?: 'sales_rep' | 'sales_manager' | 'finance_operations' | null;
+  negotiation_case_status?: 'open' | 'forwarded' | 'resolved' | null;
 }
 
 const STATUS_DISPLAY: Record<string, string> = {
@@ -26,6 +28,7 @@ const STATUS_DISPLAY: Record<string, string> = {
   pending_manager_approval: 'Pending Approval',
   pending_finance_approval: 'Pending Finance',
   escalated: 'Escalated',
+  forwarded: 'Forwarded',
   approved: 'Approved',
   returned_for_revision: 'Returned',
   rejected: 'Rejected',
@@ -45,7 +48,7 @@ const STATUS_VARIANT: Record<string, 'gray' | 'yellow' | 'green' | 'blue' | 'red
   confirmed: 'green',
 };
 
-const KANBAN_COLS = ['draft', 'sent_to_customer', 'under_negotiation', 'escalated', 'paid'];
+const KANBAN_COLS = ['draft', 'sent_to_customer', 'under_negotiation', 'forwarded', 'escalated', 'paid'];
 
 export default function QuotationsPage() {
   const router = useRouter();
@@ -65,7 +68,7 @@ export default function QuotationsPage() {
   const isManager = userRoles.includes('sales_manager') || userRoles.includes('admin');
   const isFinance = userRoles.includes('finance_operations') && !isManager;
 
-  useEffect(() => {
+  const loadQuotes = useCallback(() => {
     if (!rolesLoaded) return;
     const useManagerEndpoint = isManager || isFinance;
     const endpoint = useManagerEndpoint ? '/manager/quotations' : '/sales-rep/quotations';
@@ -82,6 +85,21 @@ export default function QuotationsPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [rolesLoaded, isManager, isFinance]);
+
+  useEffect(() => {
+    loadQuotes();
+    const refresh = () => { if (document.visibilityState === 'visible') loadQuotes(); };
+    const interval = window.setInterval(refresh, 10_000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [loadQuotes]);
+
+  const viewerRole = isFinance ? 'finance_operations' : isManager ? 'sales_manager' : 'sales_rep';
 
   return (
     <div>
@@ -106,7 +124,7 @@ export default function QuotationsPage() {
       {loading ? (
         <div className="text-center py-16 text-gray-400 text-sm">Loading...</div>
       ) : view === 'kanban' ? (
-        <KanbanView quotes={quotes} onOpen={(id) => router.push(`/quotations/${id}`)} />
+        <KanbanView quotes={quotes} viewerRole={viewerRole} onOpen={(id) => router.push(`/quotations/${id}`)} />
       ) : (
         <TableView quotes={quotes} onOpen={(id) => router.push(`/quotations/${id}`)} />
       )}
@@ -118,7 +136,7 @@ const ALLOWED_DRAGS: Record<string, string> = {
   'draft': 'pending_manager_approval',
 };
 
-function KanbanView({ quotes: initialQuotes, onOpen }: { quotes: QuoteRow[]; onOpen: (id: string) => void }) {
+function KanbanView({ quotes: initialQuotes, viewerRole, onOpen }: { quotes: QuoteRow[]; viewerRole: string; onOpen: (id: string) => void }) {
   const [quotes, setQuotes] = useState(initialQuotes);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
@@ -147,7 +165,12 @@ function KanbanView({ quotes: initialQuotes, onOpen }: { quotes: QuoteRow[]; onO
   return (
     <div className="flex gap-4 overflow-x-auto pb-4">
       {KANBAN_COLS.map((status) => {
-        const cards = quotes.filter((q) => status === 'escalated' ? ['pending_manager_approval', 'pending_finance_approval'].includes(q.status) : q.status === status);
+        const cards = quotes.filter((q) => {
+          if (status === 'escalated') return ['pending_manager_approval', 'pending_finance_approval'].includes(q.status);
+          if (status === 'forwarded') return q.status === 'under_negotiation' && Boolean(q.negotiation_owner_role) && q.negotiation_owner_role !== viewerRole;
+          if (status === 'under_negotiation') return q.status === status && (!q.negotiation_owner_role || q.negotiation_owner_role === viewerRole);
+          return q.status === status;
+        });
         const isDropTarget = dragId !== null && ALLOWED_DRAGS[dragSourceStatus.current ?? ''] === status;
         return (
           <div

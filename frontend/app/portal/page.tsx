@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, clearToken, getUser } from '@/lib/api';
 import { Badge, Button, Card } from '@/components/ui';
@@ -87,10 +87,13 @@ export default function CustomerPortalHome() {
   const [requestSending, setRequestSending] = useState(false);
   const [requestDone, setRequestDone] = useState('');
 
-  const loadQuotes = () =>
+  const loadQuotes = useCallback(() =>
     api.get<{ quotes: Quote[] }>('/portal/quotes')
-      .then((r) => setQuotes(r.quotes))
-      .catch((e) => setError(e.message));
+      .then((r) => {
+        setQuotes(r.quotes);
+        setSelected((current) => current ? { ...current, ...(r.quotes.find((quote) => quote.id === current.id) ?? {}) } : current);
+      })
+      .catch((e) => setError(e.message)), []);
 
   const loadRequests = () =>
     api.get<{ requests: QuoteRequest[] }>('/portal/quote-requests')
@@ -105,7 +108,15 @@ export default function CustomerPortalHome() {
     api.get<{ tier: TierProgress }>('/portal/tier')
       .then((r) => setTier(r.tier))
       .catch(() => {});
-  }, [router]);
+  }, [router, loadQuotes]);
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') loadQuotes(); };
+    const interval = window.setInterval(refresh, 10_000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { window.clearInterval(interval); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
+  }, [loadQuotes]);
 
   const visible = useMemo(() =>
     quotes.filter((q) =>
