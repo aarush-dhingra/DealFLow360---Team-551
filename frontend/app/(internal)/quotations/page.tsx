@@ -34,6 +34,7 @@ const STATUS_DISPLAY: Record<string, string> = {
   escalated: 'Escalated',
   forwarded: 'Forwarded',
   approved: 'Approved',
+  customer_confirmed: 'Confirmed',
   returned_for_revision: 'Returned',
   rejected: 'Rejected',
   paid: 'Paid / Done',
@@ -47,9 +48,9 @@ const STATUS_VARIANT: Record<string, 'gray' | 'yellow' | 'green' | 'blue' | 'red
   pending_manager_approval: 'yellow',
   pending_finance_approval: 'yellow',
   approved: 'green',
+  customer_confirmed: 'green',
   returned_for_revision: 'red',
   rejected: 'red',
-  confirmed: 'green',
 };
 
 const KANBAN_COLS = ['draft', 'sent_to_customer', 'under_negotiation', 'forwarded', 'escalated', 'paid'];
@@ -164,6 +165,9 @@ function KanbanView({ quotes: initialQuotes, viewerRole, onOpen }: { quotes: Quo
           if (status === 'escalated') {
             return ['pending_manager_approval', 'pending_finance_approval'].includes(q.status)
               || (viewerRole === 'sales_rep' && q.status === 'under_negotiation' && Boolean(q.negotiation_owner_role) && q.negotiation_owner_role !== 'sales_rep');
+          }
+          if (status === 'paid') {
+            return ['customer_confirmed', 'approved', 'paid', 'invoiced'].includes(q.status);
           }
           if (status === 'forwarded') return q.status === 'under_negotiation' && Boolean(q.negotiation_owner_role) && q.negotiation_owner_role !== viewerRole;
           if (status === 'under_negotiation') return q.status === status && (!q.negotiation_owner_role || q.negotiation_owner_role === viewerRole);
