@@ -45,7 +45,7 @@ type NegotiationRequest = {
   line_requests: Array<{ line_id: string; product_name: string; comment: string }>;
 };
 
-type QuoteRequest = { id: string; message: string; status: string; created_at: string; assigned_sales_rep_name?: string | null; quote_number?: string | null; quotation_id?: string | null };
+type QuoteRequest = { id: string; message: string; status: string; created_at: string; assigned_sales_rep_name?: string | null; quote_number?: string | null; quotation_id?: string | null; quotation_status?: string | null };
 type TierProgress = {
   tier_code?: string;
   tier_name?: string;
@@ -126,6 +126,12 @@ export default function CustomerPortalHome() {
     [quotes, tab]
   );
 
+  // A request remains on Outstanding until the customer has a live quotation
+  // to review. Once an offer is sent, the quotation takes over that spot.
+  const outstandingRequests = useMemo(() => myRequests.filter((request) =>
+    !request.quotation_id || ['draft', 'pending_manager_approval', 'pending_finance_approval', 'approved'].includes(request.quotation_status ?? '')
+  ), [myRequests]);
+
   async function select(q: Quote) {
     try {
       const [detail, original, requests] = await Promise.all([
@@ -185,10 +191,12 @@ export default function CustomerPortalHome() {
     setRequestSending(true);
     setRequestDone('');
     try {
-      await api.post('/portal/quote-requests', { message: requestMsg });
+      const result = await api.post<{ request: QuoteRequest }>('/portal/quote-requests', { message: requestMsg });
       setRequestMsg('');
       setRequestDone('Request sent. Your assigned sales representative will prepare an initial offer.');
+      setMyRequests((items) => [result.request, ...items.filter((item) => item.id !== result.request.id)]);
       loadRequests();
+      setTab('outstanding');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not send request.');
     } finally {
@@ -306,7 +314,22 @@ export default function CustomerPortalHome() {
           <div className="mt-5 grid lg:grid-cols-2 gap-5">
             {/* Left: quote list */}
             <section className="space-y-3">
-              {visible.length === 0 ? (
+              {tab === 'outstanding' && outstandingRequests.map((request) => (
+                <Card key={request.id} className="border-brand-100 bg-brand-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900">Quotation request in progress</p>
+                      <p className="mt-1 line-clamp-2 text-sm text-gray-600">{request.message}</p>
+                      <p className="mt-3 text-xs text-gray-600">
+                        Assigned sales rep: <span className="font-semibold text-gray-800">{request.assigned_sales_rep_name ?? 'Assigning now'}</span>
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">Submitted {new Date(request.created_at).toLocaleString()}</p>
+                    </div>
+                    <Badge variant="blue">{request.quotation_id ? 'Offer in approval' : 'Assigned'}</Badge>
+                  </div>
+                </Card>
+              ))}
+              {visible.length === 0 && !(tab === 'outstanding' && outstandingRequests.length > 0) ? (
                 <Card className="p-5 text-sm text-gray-500">No {tab} orders.</Card>
               ) : (
                 visible.map((q) => (
