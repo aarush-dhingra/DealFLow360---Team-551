@@ -269,7 +269,10 @@ export async function beginCustomerNegotiation(approvalId, actorUser) {
 
     const reason = 'Moved to customer negotiation by Sales Manager.';
     await repo.updateApprovalStatus(client, approvalId, 'returned_for_revision', actorUser.id, reason);
-    await repo.recordApprovalAction(client, approvalId, actorUser.id, 'begin_customer_negotiation', reason);
+    // approval_actions.action is a constrained workflow enum. The customer-negotiation
+    // transition is represented as a return for revision there; the dedicated audit
+    // event below preserves the more specific customer-negotiation intent.
+    await repo.recordApprovalAction(client, approvalId, actorUser.id, 'return_for_revision', reason);
     await client.query(
       `INSERT INTO negotiation_cases(quotation_id, owner_role, status, last_handoff_reason, updated_at)
        VALUES($1, 'sales_manager', 'open', $2, now())
