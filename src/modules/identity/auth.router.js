@@ -10,7 +10,7 @@ const forgotPasswordSchema = z.object({
   email: z.string().email().max(320).transform((v) => v.toLowerCase())
 });
 const resetPasswordSchema = z.object({
-  token: z.string().min(1).max(256),
+  token: z.string().length(6),
   newPassword: z.string().min(8).max(128)
 });
 

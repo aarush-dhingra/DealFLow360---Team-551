@@ -110,20 +110,23 @@ export async function forgotPassword(request, response, next) {
       // Don't reveal whether the email exists
       return response.json({ data: { message: 'If that email is registered, a reset token has been generated.' } });
     }
-    const token = randomBytes(32).toString('base64url');
-    const hash = createHash('sha256').update(token).digest('hex');
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const hash = createHash('sha256').update(otp).digest('hex');
     await pool.query(
-      `INSERT INTO password_reset_tokens (user_id, token_hash) VALUES ($1, $2)`,
+      `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+       VALUES ($1, $2, now() + INTERVAL '10 minutes')
+       ON CONFLICT DO NOTHING`,
       [rows[0].id, hash]
     );
-    response.json({ data: { token } });
+    console.log(`\n🔑  Password reset OTP for ${email}: ${otp}  (valid 10 min)\n`);
+    response.json({ data: { message: 'OTP sent.' } });
   } catch (error) { next(error); }
 }
 
 export async function resetPassword(request, response, next) {
   try {
-    const { token, newPassword } = request.validated.body;
-    const hash = createHash('sha256').update(token).digest('hex');
+    const { token: otp, newPassword } = request.validated.body;
+    const hash = createHash('sha256').update(otp).digest('hex');
     const { rows } = await pool.query(
       `SELECT id, user_id FROM password_reset_tokens
        WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
