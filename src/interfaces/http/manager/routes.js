@@ -18,7 +18,7 @@ import * as financeReadController from './finance-read.controller.js';
 export const managerRouter = Router();
 
 const internal = ['admin', 'sales_manager', 'finance_operations'];
-const managers = ['admin'];
+const managers = ['admin', 'sales_manager'];
 const reviewers = ['admin', 'sales_manager', 'finance_operations'];
 
 // Managers monitor the warehouse plan and result but cannot alter allocations;
