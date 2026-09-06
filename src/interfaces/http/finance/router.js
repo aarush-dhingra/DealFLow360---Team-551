@@ -22,7 +22,6 @@ import {
   issueCreditNoteController,
   applyCreditNoteController
 } from './credit-notes.controller.js';
-import { getInventoryWorkspace, createWarehouse, updateWarehouse, adjustInventory, bootstrapStarterInventory } from './inventory.controller.js';
 
 export const financeRouter = Router();
 
@@ -49,7 +48,7 @@ financeRouter.get(
 
 financeRouter.post(
   '/fulfillment/quotations/:quotationId/allocate',
-  requireFinanceOrManager,
+  requireFinance,
   allocateFulfillmentController
 );
 
@@ -90,12 +89,6 @@ financeRouter.post(
   requireFinance,
   shipFulfillmentController
 );
-
-financeRouter.get('/inventory', requireFinance, getInventoryWorkspace);
-financeRouter.post('/inventory/starter-setup', requireFinance, bootstrapStarterInventory);
-financeRouter.post('/inventory/warehouses', requireFinance, createWarehouse);
-financeRouter.put('/inventory/warehouses/:warehouseId', requireFinance, updateWarehouse);
-financeRouter.post('/inventory/warehouses/:warehouseId/adjustments', requireFinance, adjustInventory);
 
 // Keep the error envelope local to finance routes.
 financeRouter.use(errorHandler);

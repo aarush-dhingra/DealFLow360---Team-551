@@ -24,7 +24,6 @@ const flatNavItems = [
   { label: 'Fin: Fulfillment', href: '/finance/fulfillment',   roles: ['finance_operations'] },
   { label: 'Fin: Payments',    href: '/finance/payments',       roles: ['finance_operations'] },
   { label: 'Fin: Credits',     href: '/finance/credit-notes',  roles: ['finance_operations'] },
-  { label: 'Fin: Inventory',   href: '/finance/inventory',      roles: ['finance_operations'] },
 ];
 
 // Admin-only grouped dropdowns
@@ -45,7 +44,6 @@ const adminGroups = [
       { label: 'Fin: Fulfillment', href: '/finance/fulfillment' },
       { label: 'Fin: Payments',    href: '/finance/payments' },
       { label: 'Fin: Credits',     href: '/finance/credit-notes' },
-      { label: 'Fin: Inventory',   href: '/finance/inventory' },
     ],
   },
   {
@@ -56,6 +54,7 @@ const adminGroups = [
       { label: 'Tier Program',   href: '/settings/tier-program' },
       { label: 'Customers',      href: '/settings/customers' },
       { label: 'Subscriptions',  href: '/subscriptions' },
+      { label: 'Warehouses',     href: '/settings/warehouses' },
     ],
   },
 ];

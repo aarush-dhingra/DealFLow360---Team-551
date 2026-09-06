@@ -92,16 +92,3 @@ export const issueCreditNoteBody = z.object({
 export const creditNoteParams = z.object({
   creditNoteId: z.string().uuid()
 });
-
-export const warehouseParams = z.object({ warehouseId: z.string().uuid() });
-export const warehouseBody = z.object({
-  code: z.string().trim().min(2).max(30),
-  name: z.string().trim().min(2).max(120),
-  shippingCostWeight: z.coerce.number().finite().min(0),
-  isActive: z.boolean().default(true)
-});
-export const inventoryAdjustmentBody = z.object({
-  productId: z.string().uuid(),
-  deltaQuantity: z.coerce.number().finite().refine((value) => value !== 0, 'deltaQuantity cannot be zero'),
-  reason: z.string().trim().min(3).max(500)
-});
