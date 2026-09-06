@@ -32,7 +32,12 @@ export default function LoginPage() {
   }
   function validatePassword(val: string) {
     if (!val) { setPassErr(''); return true; }
-    if (val.length < 8) { setPassErr('Password must be at least 8 characters'); return false; }
+    const issues: string[] = [];
+    if (val.length < 6) issues.push('at least 6 characters');
+    if (!/[A-Z]/.test(val)) issues.push('an uppercase letter');
+    if (!/[a-z]/.test(val)) issues.push('a lowercase letter');
+    if (!/[^A-Za-z0-9]/.test(val)) issues.push('a symbol (!@#$%...)');
+    if (issues.length) { setPassErr('Password needs: ' + issues.join(', ')); return false; }
     setPassErr(''); return true;
   }
 

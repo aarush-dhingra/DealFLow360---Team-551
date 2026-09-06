@@ -11,17 +11,17 @@ const forgotPasswordSchema = z.object({
 });
 const resetPasswordSchema = z.object({
   token: z.string().length(6),
-  newPassword: z.string().min(8).max(128)
+  newPassword: z.string().min(6).max(128)
 });
 
 const loginSchema = z.object({
   email: z.string().email().max(320).transform((value) => value.toLowerCase()),
-  password: z.string().min(8).max(128)
+  password: z.string().min(6).max(128)
 });
-const passwordSchema = z.object({ newPassword: z.string().min(8).max(128) });
+const passwordSchema = z.object({ newPassword: z.string().min(6).max(128) });
 const customerSignupSchema = z.object({
   email: z.string().email().max(320).transform((value) => value.toLowerCase()),
-  password: z.string().min(8).max(128),
+  password: z.string().min(6).max(128),
   displayName: z.string().trim().min(1).max(150)
 });
 
