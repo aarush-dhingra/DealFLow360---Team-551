@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, getUser } from '@/lib/api';
+import { useLiveUpdates } from '@/lib/useLiveUpdates';
 
 import { routeToRisk, type BackendApprovalRoute } from '@/lib/risk';
 import { PageHeader, Badge, RiskBadge, Button, Card } from '@/components/ui';
@@ -86,18 +87,8 @@ export default function QuotationsPage() {
       .finally(() => setLoading(false));
   }, [rolesLoaded, isManager, isFinance]);
 
-  useEffect(() => {
-    loadQuotes();
-    const refresh = () => { if (document.visibilityState === 'visible') loadQuotes(); };
-    const interval = window.setInterval(refresh, 10_000);
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener('focus', refresh);
-      document.removeEventListener('visibilitychange', refresh);
-    };
-  }, [loadQuotes]);
+  useEffect(() => { loadQuotes(); }, [loadQuotes]);
+  useLiveUpdates(loadQuotes);
 
   const viewerRole = isFinance ? 'finance_operations' : isManager ? 'sales_manager' : 'sales_rep';
 
@@ -164,9 +155,12 @@ function KanbanView({ quotes: initialQuotes, viewerRole, onOpen }: { quotes: Quo
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-4">
-      {KANBAN_COLS.map((status) => {
+      {(viewerRole === 'sales_rep' ? KANBAN_COLS.filter((status) => status !== 'forwarded') : KANBAN_COLS).map((status) => {
         const cards = quotes.filter((q) => {
-          if (status === 'escalated') return ['pending_manager_approval', 'pending_finance_approval'].includes(q.status);
+          if (status === 'escalated') {
+            return ['pending_manager_approval', 'pending_finance_approval'].includes(q.status)
+              || (viewerRole === 'sales_rep' && q.status === 'under_negotiation' && Boolean(q.negotiation_owner_role) && q.negotiation_owner_role !== 'sales_rep');
+          }
           if (status === 'forwarded') return q.status === 'under_negotiation' && Boolean(q.negotiation_owner_role) && q.negotiation_owner_role !== viewerRole;
           if (status === 'under_negotiation') return q.status === status && (!q.negotiation_owner_role || q.negotiation_owner_role === viewerRole);
           return q.status === status;

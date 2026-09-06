@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, clearToken, getUser } from '@/lib/api';
+import { useLiveUpdates } from '@/lib/useLiveUpdates';
 import { Badge, Button, Card } from '@/components/ui';
 
 type Quote = {
@@ -110,13 +111,7 @@ export default function CustomerPortalHome() {
       .catch(() => {});
   }, [router, loadQuotes]);
 
-  useEffect(() => {
-    const refresh = () => { if (document.visibilityState === 'visible') loadQuotes(); };
-    const interval = window.setInterval(refresh, 10_000);
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
-    return () => { window.clearInterval(interval); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
-  }, [loadQuotes]);
+  useLiveUpdates(loadQuotes);
 
   const visible = useMemo(() =>
     quotes.filter((q) =>

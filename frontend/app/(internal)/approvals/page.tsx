@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, getUser } from '@/lib/api';
+import { useLiveUpdates } from '@/lib/useLiveUpdates';
 import { useRoleGuard } from '@/lib/useRoleGuard';
 import { routeToRisk, type BackendApprovalRoute } from '@/lib/risk';
 import { PageHeader, RiskBadge, Badge, Card } from '@/components/ui';
@@ -54,14 +55,8 @@ export default function ApprovalsPage() {
       .finally(() => setLoading(false));
     api.get<{cases:NegotiationRow[]}>('/negotiations').then(r => setNegotiations(r.cases)).catch(() => {});
   }, [isAdmin]);
-  useEffect(() => {
-    load();
-    const refresh = () => { if (document.visibilityState === 'visible') load(); };
-    const interval = window.setInterval(refresh, 10_000);
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
-    return () => { window.clearInterval(interval); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
+  useLiveUpdates(load);
 
   const pending  = approvals.filter((a) => a.status === 'pending');
   const returned = approvals.filter((a) => a.status === 'returned_for_revision');

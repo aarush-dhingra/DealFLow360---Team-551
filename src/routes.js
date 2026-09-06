@@ -6,6 +6,7 @@ import { managerRouter } from './interfaces/http/manager/routes.js';
 import { financeRouter } from './interfaces/http/finance/router.js';
 import { customerPortalRouter } from './interfaces/http/customer-portal/routes.js';
 import { negotiationRouter } from './interfaces/http/negotiations/negotiation.routes.js';
+import { realtimeRouter } from './interfaces/http/realtime/realtime.routes.js';
 
 export const apiRouter = Router();
 
@@ -20,3 +21,4 @@ apiRouter.use('/manager', managerRouter);
 apiRouter.use('/finance', financeRouter);
 apiRouter.use('/portal', customerPortalRouter);
 apiRouter.use('/negotiations', negotiationRouter);
+apiRouter.use('/events', realtimeRouter);
