@@ -23,7 +23,7 @@ export default function LoginPage() {
   const [emailErr, setEmailErr] = useState('');
   const [passErr, setPassErr] = useState('');
 
-  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
   function validateEmail(val: string) {
     if (!val) { setEmailErr(''); return true; }
