@@ -14,6 +14,7 @@ customerPortalRouter.get('/quotes/:id/versions/:n', requireAuth, requireRole(...
 customerPortalRouter.get('/quotes/:id/messages', requireAuth, requireRole(...portal), portalController.getMessages);
 customerPortalRouter.get('/quotes/:id/negotiation-requests', requireAuth, requireRole(...portal), portalController.getNegotiationRequests);
 customerPortalRouter.post('/quotes/:id/accept', requireAuth, requireRole(...portal), portalController.acceptQuotation);
+customerPortalRouter.post('/quotes/:id/reject', requireAuth, requireRole(...portal), portalController.rejectQuotation);
 customerPortalRouter.post('/quotes/:id/counter', requireAuth, requireRole(...portal), portalController.submitCounterOffer);
 customerPortalRouter.post('/quotes/:id/negotiation-requests', requireAuth, requireRole(...portal), portalController.submitStructuredNegotiation);
 customerPortalRouter.get('/quote-requests', requireAuth, requireRole(...portal), portalController.listMyQuoteRequests);

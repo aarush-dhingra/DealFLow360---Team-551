@@ -95,6 +95,60 @@ export async function acceptQuote(userEmail, quotationId, lockVersion, customerI
   });
 }
 
+/**
+ * A customer may decline an offer that is currently available for review.
+ * This is terminal for the current quote and deliberately resolves any
+ * negotiation case after the quote transition succeeds.
+ */
+export async function rejectQuote(userEmail, quotationId, lockVersion, customerId) {
+  return inTransaction(async (client) => {
+    const { rows } = await client.query(
+      `SELECT id, status, lock_version, current_version_number
+       FROM quotations WHERE id = $1 AND customer_id = $2 FOR UPDATE`,
+      [quotationId, customerId]
+    );
+    const quote = rows[0];
+    if (!quote) throw new ForbiddenError('Quote not found or access denied');
+    if (!ACCEPTABLE_STATUSES.includes(quote.status)) {
+      throw new ConflictError(
+        `Quote cannot be declined in status '${quote.status}'. Expected: ${ACCEPTABLE_STATUSES.join(', ')}.`
+      );
+    }
+    if (quote.lock_version !== lockVersion) {
+      throw new ConflictError('Quote was updated by another party. Refresh and try again.');
+    }
+
+    await client.query(
+      `UPDATE quotations
+       SET status = 'rejected', lock_version = lock_version + 1,
+           last_activity_at = now(), updated_at = now()
+       WHERE id = $1`,
+      [quotationId]
+    );
+    const closedCase = await client.query(
+      `UPDATE negotiation_cases
+       SET status='resolved', resolved_at=now(), updated_at=now()
+       WHERE quotation_id=$1 AND status='open'
+       RETURNING id`,
+      [quotationId]
+    );
+    if (closedCase.rows[0]) {
+      await client.query(
+        `INSERT INTO negotiation_case_events(negotiation_case_id,event_type)
+         VALUES($1,'customer_rejected')`,
+        [closedCase.rows[0].id]
+      );
+    }
+    await writeAuditAndOutbox(client, {
+      aggregateType: 'quotation', aggregateId: quotationId, eventType: 'customer_rejected', actorUserId: null,
+      beforeState: { status: quote.status, lock_version: quote.lock_version },
+      afterState: { status: 'rejected', lock_version: lockVersion + 1 },
+      metadata: { quotationId, customerId, version_number: quote.current_version_number, actor: 'customer', actor_email: userEmail, negotiationCaseResolved: Boolean(closedCase.rows[0]) },
+    });
+    return { status: 'rejected', lock_version: lockVersion + 1 };
+  });
+}
+
 export async function submitCounter(
   userEmail,
   quotationId,

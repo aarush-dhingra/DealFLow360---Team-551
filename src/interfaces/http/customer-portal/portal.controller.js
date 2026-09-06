@@ -16,7 +16,7 @@ import {
 } from '../../../domains/customer-portal/quotation.repository.js';
 import { getTierProgress } from '../../../domains/customer-portal/quotation.repository.js';
 import { getThread } from '../../../domains/customer-portal/negotiation.repository.js';
-import { acceptQuote, submitCounter } from '../../../domains/customer-portal/quotation.service.js';
+import { acceptQuote, rejectQuote, submitCounter } from '../../../domains/customer-portal/quotation.service.js';
 
 export function health(_req, res) {
   res.json({ status: 'customer portal online' });
@@ -76,6 +76,16 @@ export async function acceptQuotation(req, res, next) {
     const result = await acceptQuote(req.user.email, req.params.id, lock_version, quoteCheck.customerId);
     const { resolveCase } = await import('../negotiations/negotiation.controller.js');
     await import('../../../infrastructure/database/transaction.js').then(({ inTransaction }) => inTransaction((client) => resolveCase(req.params.id, null, client)));
+    ok(res, result);
+  } catch (err) { next(err); }
+}
+
+export async function rejectQuotation(req, res, next) {
+  try {
+    const { lock_version } = validate(acceptQuoteSchema, req.body);
+    const quoteCheck = await getPortalQuotation(req.user.email, req.params.id);
+    if (!quoteCheck) throw new NotFoundError('Quote');
+    const result = await rejectQuote(req.user.email, req.params.id, lock_version, quoteCheck.customerId);
     ok(res, result);
   } catch (err) { next(err); }
 }

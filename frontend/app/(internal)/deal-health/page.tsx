@@ -163,7 +163,7 @@ export default function DealHealthPage() {
                       <td className="px-4 py-3 text-gray-500">{parseFloat(a.rep_avg_discount_percent || '0').toFixed(1)}%</td>
                       <td className="px-4 py-3"><Badge variant="yellow">+{parseFloat(a.delta || '0').toFixed(1)} pts above avg</Badge></td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="warning" onClick={(e) => { e.stopPropagation(); router.push('/approvals'); }}>
+                        <Button variant="warning" onClick={() => router.push('/approvals')}>
                           Escalate
                         </Button>
                       </td>

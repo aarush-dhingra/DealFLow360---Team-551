@@ -25,7 +25,7 @@ type Line = { id: string; product_name: string; quantity: string; net_line_value
 type Detail = Quote & {
   customer_name: string;
   lock_version: number;
-  version?: { lines: Line[]; grand_total: string; currency_code: string };
+  version?: { version_number: number; lines: Line[]; grand_total: string; currency_code: string };
 };
 
 type OfferVersion = {
@@ -191,6 +191,17 @@ export default function CustomerPortalHome() {
     }
   }
 
+  async function rejectQuotation() {
+    if (!selected || !window.confirm('Decline this quotation? This closes the current offer.')) return;
+    try {
+      await api.post(`/portal/quotes/${selected.id}/reject`, { lock_version: selected.lock_version });
+      await select(selected);
+      loadQuotes();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not decline quotation.');
+    }
+  }
+
   async function sendQuoteRequest() {
     if (!requestMsg.trim()) return;
     setRequestSending(true);
@@ -210,8 +221,11 @@ export default function CustomerPortalHome() {
     }
   }
 
-  const canNegotiate = selected && !hasOpenNegotiation(selected) && !COMPLETE.has(selected.status) &&
-    !['rejected', 'cancelled', 'customer_confirmed'].includes(selected.status);
+  // A sent offer is actionable even when its negotiation case remains assigned
+  // to a rep, manager, or finance user. `under_negotiation` is the only state
+  // in which the customer is genuinely waiting for the next offer.
+  const canRespondToOffer = selected && ['sent_to_customer', 'approved'].includes(selected.status);
+  const canNegotiate = canRespondToOffer;
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -446,7 +460,7 @@ export default function CustomerPortalHome() {
                       {negotiationRequests.length === 0 && <p className="text-sm text-gray-400">No change requests submitted yet.</p>}
                     </div>
                   </div>
-                  {selected.negotiation_owner_role && (
+                  {selected.negotiation_owner_role && selected.status === 'under_negotiation' && (
                     <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
                       Your negotiation is currently with <strong>{selected.negotiation_owner_role === 'sales_manager' ? 'a Sales Manager' : selected.negotiation_owner_role === 'finance_operations' ? 'Finance' : 'your Sales Representative'}</strong>.
                       {selected.assigned_sales_rep_name && <span className="ml-1">Your assigned sales rep is <strong>{selected.assigned_sales_rep_name}</strong>.</span>}
@@ -493,19 +507,16 @@ export default function CustomerPortalHome() {
                         <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand" />
                       </div>
                       <div className="flex gap-2 flex-wrap">
-                        <Button variant="secondary" onClick={submitRequest} disabled={submitting || (!message.trim() && !discount && !deliveryDate) || (message.trim() && !activeLine)}>
-                          {submitting ? 'Sending…' : 'Submit Request'}
+                        <Button variant="secondary" onClick={submitRequest} disabled={submitting || (!message.trim() && !discount && !deliveryDate) || Boolean(message.trim() && !activeLine)}>
+                          {submitting ? 'Sending…' : 'Request changes'}
                         </Button>
-                        {['sent_to_customer', 'approved'].includes(selected.status) && (
-                          <Button variant="primary" onClick={confirmQuotation}>
-                            Confirm Quotation
-                          </Button>
-                        )}
+                        <Button variant="primary" onClick={confirmQuotation}>Accept offer</Button>
+                        <Button variant="danger" onClick={rejectQuotation}>Decline offer</Button>
                       </div>
                     </div>
                   )}
 
-                  {selected.negotiation_owner_role && (
+                  {selected.status === 'under_negotiation' && selected.negotiation_owner_role && (
                     <div className="border-t pt-4 px-3 py-2 bg-blue-50 rounded-lg text-sm text-blue-900">
                       <span className="font-medium">Your request is being reviewed.</span> The current owner will send a revised offer here when it is ready.
                     </div>

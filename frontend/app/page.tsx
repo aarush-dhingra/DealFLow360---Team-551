@@ -43,7 +43,7 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (!validateEmail(email) | !validatePassword(password)) return;
+    if (!validateEmail(email) || !validatePassword(password)) return;
     setLoading(true); setError('');
     try {
       const res = await api.post<{ data: { accessToken: string; user: { id: string; email: string; displayName: string; roles: string[]; mustChangePassword: boolean } } }>(
@@ -58,7 +58,7 @@ export default function LoginPage() {
 
   async function handleCustomerSignup(e: React.FormEvent) {
     e.preventDefault();
-    if (!validateEmail(email) | !validatePassword(password)) return;
+    if (!validateEmail(email) || !validatePassword(password)) return;
     setLoading(true); setError('');
     try {
       const res = await api.post<{ data: { accessToken: string; user: { id: string; email: string; displayName: string; roles: string[]; mustChangePassword: boolean } } }>(
