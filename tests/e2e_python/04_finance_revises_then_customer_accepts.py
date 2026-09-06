@@ -1,4 +1,4 @@
-from common import accept, ask_for_discount, case_for, expect, forward_to_finance, prepare_initial_offer, revise
+from common import accept, approve_and_send, ask_for_discount, case_for, expect, forward_to_finance, prepare_initial_offer, revise
 
 
 if __name__ == "__main__":
@@ -10,5 +10,6 @@ if __name__ == "__main__":
     finance_case = case_for(flow, "finance")
     expect(finance_case["owner_role"], "finance_operations", "Finance receives the forwarded negotiation")
     revise(flow, "finance", 3, "Finance approved a final 3% concession.")
+    approve_and_send(flow, "finance")
     accept(flow)
     print("PASS: Finance revision flow completed")

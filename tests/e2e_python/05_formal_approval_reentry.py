@@ -11,8 +11,5 @@ if __name__ == "__main__":
     approvals = request("GET", "/manager/approvals", token=flow["auth"]["manager"])["approvals"]
     matches = [item for item in approvals if item["quotation_id"] == flow["quote_id"] and item["status"] == "pending"]
     if not matches:
-        raise AssertionError(
-            "No formal approval was created for the negotiated final quote. "
-            "This is the expected red test until approval re-entry is implemented."
-        )
+        raise AssertionError("No formal approval was created for the negotiated final quote.")
     print("PASS: formal approval queue contains the negotiated exception")

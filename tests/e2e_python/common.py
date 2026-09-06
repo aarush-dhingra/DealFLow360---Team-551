@@ -95,10 +95,12 @@ def prepare_initial_offer(label: str, discount: float = 0) -> dict:
     if len(assignees) != 1:
         raise AssertionError("Customer quote request was not assigned to an active Sales Rep")
     print(f"  PASS  customer request assigned to Sales Rep ({assignees[0]['email']})")
+    auth["rep"] = login(assignees[0]["email"])
 
     product = request("GET", "/sales-rep/quotations/meta/products", token=auth["rep"])["data"][0]
     created = request("POST", "/sales-rep/quotations", {
         "customerId": customer_id(auth["admin"], customer["name"]),
+        "quoteRequestId": quote_request["id"],
         "currencyCode": "USD",
         "discountMode": "line",
         "lines": [{"productId": product["id"], "quantity": 1, "lineDiscountPercent": discount}],
@@ -142,7 +144,7 @@ def case_for(flow: dict, role: str) -> dict:
     return matches[0]
 
 
-def revise(flow: dict, role: str, discount: float, reason: str) -> None:
+def revise(flow: dict, role: str, discount: float, reason: str) -> str:
     detail = request("GET", f"/negotiations/{flow['quote_id']}", token=flow["auth"][role])
     if not detail["can_edit"]:
         raise AssertionError(f"{role} cannot edit its assigned negotiation")
@@ -157,7 +159,31 @@ def revise(flow: dict, role: str, discount: float, reason: str) -> None:
         "lines": lines,
         "reason": reason,
     }, flow["auth"][role])
-    expect(response["data"]["status"], "sent_to_customer", f"{role} revised offer is sent to customer")
+    status = response["data"]["status"]
+    if status not in {"sent_to_customer", "pending_manager_approval", "pending_finance_approval"}:
+        raise AssertionError(f"Unexpected revision status: {status}")
+    print(f"  PASS  {role} revised offer enters {status}")
+    return status
+
+
+def approve_and_send(flow: dict, sender_role: str) -> None:
+    """Complete the required formal approval chain, then publish the approved offer."""
+    for _ in range(3):
+        quote = portal_quote(flow)
+        if quote["status"] == "approved":
+            break
+        if quote["status"] not in {"pending_manager_approval", "pending_finance_approval"}:
+            raise AssertionError(f"Expected an approval state, got {quote['status']}")
+        role = "manager" if quote["status"] == "pending_manager_approval" else "finance"
+        approvals = request("GET", "/manager/approvals?status=pending", token=flow["auth"][role])["approvals"]
+        matches = [item for item in approvals if item["quotation_id"] == flow["quote_id"] and item["status"] == "pending"]
+        if len(matches) != 1:
+            raise AssertionError(f"Expected one pending {role} approval, found {len(matches)}")
+        result = request("POST", f"/manager/approvals/{matches[0]['id']}/approve", {"reason": "E2E formal approval after negotiation."}, flow["auth"][role])
+        print(f"  PASS  {role} formal approval completed: {result['next_status']}")
+    expect(portal_quote(flow)["status"], "approved", "revised offer is formally approved")
+    request("POST", f"/sales-rep/quotations/{flow['quote_id']}/send-to-customer", {}, flow["auth"][sender_role])
+    expect(portal_quote(flow)["status"], "sent_to_customer", "approved offer is sent to customer")
 
 
 def forward_to_finance(flow: dict) -> None:
