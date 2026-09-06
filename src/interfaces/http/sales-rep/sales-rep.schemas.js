@@ -15,7 +15,10 @@ const applyDiscountModeRules = (value, context) => {
   if (value.discountMode === 'line' && value.orderDiscountPercent !== undefined) context.addIssue({ code: 'custom', path: ['orderDiscountPercent'], message: 'Order discount cannot be used in line mode.' });
   if (value.discountMode === 'line' && value.lines.some((line) => line.lineDiscountPercent === undefined)) context.addIssue({ code: 'custom', path: ['lines'], message: 'Each line requires a discount in line mode.' });
 };
-export const createQuoteSchema = quotePayloadSchema.extend({ customerId: uuid }).superRefine(applyDiscountModeRules);
+export const createQuoteSchema = quotePayloadSchema.extend({
+  customerId: uuid,
+  quoteRequestId: uuid.optional()
+}).superRefine(applyDiscountModeRules);
 export const revisionSchema = quotePayloadSchema.extend({ expectedLockVersion: z.coerce.number().int().positive() }).superRefine(applyDiscountModeRules);
 export const idParams = z.object({ quoteId: uuid, approvalId: uuid.optional() });
 export const approvalActionSchema = z.object({ reason: z.string().trim().min(1).max(1000) });

@@ -30,10 +30,13 @@ export async function listQuotations(request, response, next) {
   try {
     const internalUser = request.principal.roles.some((role) => INTERNAL_ROLES.includes(role));
     const { rows } = await pool.query(
-      `SELECT q.*, c.legal_name, qv.grand_total, ra.blended_risk_percent, ra.route,
-              nc.owner_role AS negotiation_owner_role, nc.status AS negotiation_case_status
+      `SELECT q.*, c.legal_name, COALESCE(q.owner_display_name, u.display_name, 'Removed internal user') AS owner_name,
+              qv.grand_total, ra.blended_risk_percent, ra.route,
+              nc.owner_role AS negotiation_owner_role, nc.status AS negotiation_case_status,
+              nc.last_handoff_reason, nc.updated_at AS negotiation_updated_at
        FROM quotations q
        JOIN customers c ON c.id = q.customer_id
+       LEFT JOIN users u ON u.id = q.owner_user_id
        LEFT JOIN quotation_versions qv ON qv.quotation_id = q.id
          AND qv.version_number = q.current_version_number
        LEFT JOIN risk_assessments ra ON ra.quotation_version_id = qv.id
@@ -50,6 +53,24 @@ export async function createQuotation(request, response, next) {
   try {
     const result = await inTransaction(async (client) => {
       const input = request.validated.body;
+      let quoteRequest = null;
+      if (input.quoteRequestId) {
+        const { rows } = await client.query(
+          `SELECT * FROM quote_requests WHERE id = $1 FOR UPDATE`,
+          [input.quoteRequestId]
+        );
+        quoteRequest = rows[0];
+        if (!quoteRequest) throw new AppError(404, 'QUOTE_REQUEST_NOT_FOUND', 'Quote request was not found.');
+        if (quoteRequest.assigned_sales_rep_id !== request.principal.id) {
+          throw new AppError(403, 'QUOTE_REQUEST_NOT_ASSIGNED', 'This quote request is assigned to another sales representative.');
+        }
+        if (quoteRequest.customer_id !== input.customerId) {
+          throw new AppError(422, 'QUOTE_REQUEST_CUSTOMER_MISMATCH', 'The quotation customer must match the quote request.');
+        }
+        if (quoteRequest.status === 'converted' || quoteRequest.quotation_id) {
+          throw new AppError(409, 'QUOTE_REQUEST_CONVERTED', 'A quotation has already been created for this request.');
+        }
+      }
       const customer = await client.query('SELECT * FROM customers WHERE id = $1', [input.customerId]);
       if (!customer.rows[0]) {
         throw new AppError(404, 'CUSTOMER_NOT_FOUND', 'Customer was not found.');
@@ -84,6 +105,19 @@ export async function createQuotation(request, response, next) {
         afterState: quote,
         metadata: { version: version.version_number, risk: assessment.blended_risk_percent }
       });
+      if (quoteRequest) {
+        await client.query(
+          `UPDATE quote_requests
+           SET status = 'converted', quotation_id = $1, converted_at = now()
+           WHERE id = $2`,
+          [quote.id, quoteRequest.id]
+        );
+        await writeAuditAndOutbox(client, {
+          aggregateType: 'quote_request', aggregateId: quoteRequest.id,
+          eventType: 'quote_request.converted', actorUserId: request.principal.id,
+          metadata: { quotationId: quote.id, customerId: quote.customer_id }
+        });
+      }
       return { quote, version, assessment };
     });
     response.status(201).json({ data: result });
@@ -211,7 +245,7 @@ export async function getTimeline(request, response, next) {
   } catch (error) { next(error); }
 }
 
-export async function listQuoteRequests(request,response,next){try{const {rows}=await pool.query(`SELECT qr.id,qr.message,qr.status,qr.created_at,cc.email AS contact_email,cc.display_name AS contact_name,c.legal_name AS customer_name FROM quote_requests qr JOIN customer_contacts cc ON cc.id=qr.contact_id JOIN customers c ON c.id=qr.customer_id WHERE qr.assigned_sales_rep_id=$1 ORDER BY qr.created_at DESC`,[request.principal.id]);response.json({requests:rows});}catch(error){next(error);}}
+export async function listQuoteRequests(request,response,next){try{const {rows}=await pool.query(`SELECT qr.id,qr.customer_id,qr.message,qr.status,qr.created_at,qr.assigned_at,qr.quotation_id,qr.converted_at,cc.email AS contact_email,cc.display_name AS contact_name,c.legal_name AS customer_name,q.quote_number, q.status AS quotation_status FROM quote_requests qr JOIN customer_contacts cc ON cc.id=qr.contact_id JOIN customers c ON c.id=qr.customer_id LEFT JOIN quotations q ON q.id=qr.quotation_id WHERE qr.assigned_sales_rep_id=$1 ORDER BY qr.created_at DESC`,[request.principal.id]);response.json({requests:rows});}catch(error){next(error);}}
 
 export async function getNegotiationRequests(request, response, next) {
   try {

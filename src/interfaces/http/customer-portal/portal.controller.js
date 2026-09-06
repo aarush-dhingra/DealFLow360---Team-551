@@ -236,11 +236,11 @@ export async function createQuoteRequest(req, res, next) {
 
     const { inTransaction, writeAuditAndOutbox } = await import('../../../infrastructure/database/transaction.js');
     const request = await inTransaction(async (client) => {
-      const { rows: reps } = await client.query(`SELECT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id AND ur.role='sales_rep' WHERE u.is_active ORDER BY (SELECT count(*) FROM quote_requests qr WHERE qr.assigned_sales_rep_id=u.id AND qr.status IN ('pending','viewed')) ASC,u.created_at ASC LIMIT 1`);
+      const { rows: reps } = await client.query(`SELECT u.id,u.display_name FROM users u JOIN user_roles ur ON ur.user_id=u.id AND ur.role='sales_rep' WHERE u.is_active ORDER BY (SELECT count(*) FROM quote_requests qr WHERE qr.assigned_sales_rep_id=u.id AND qr.status IN ('pending','viewed')) ASC,u.created_at ASC LIMIT 1`);
       if (!reps[0]) throw new Error('No active sales representative is available.');
       const { rows } = await client.query(`INSERT INTO quote_requests (customer_id,contact_id,message,assigned_sales_rep_id,assigned_at) VALUES ($1,$2,$3,$4,now()) RETURNING id,message,status,created_at,assigned_sales_rep_id`,[contact.customer_id,contact.id,message,reps[0].id]);
       await writeAuditAndOutbox(client,{aggregateType:'quote_request',aggregateId:rows[0].id,eventType:'quote_request.assigned_to_sales_rep',actorUserId:null,afterState:rows[0],metadata:{customerId:contact.customer_id,assignedSalesRepId:reps[0].id}});
-      return rows[0];
+      return { ...rows[0], assigned_sales_rep_name: reps[0].display_name };
     });
     created(res, { request });
   } catch (err) { next(err); }
@@ -255,8 +255,13 @@ export async function listMyQuoteRequests(req, res, next) {
     if (!contacts[0]) return ok(res, { requests: [] });
 
     const { rows } = await pool.query(
-      `SELECT id, message, status, created_at FROM quote_requests
-       WHERE customer_id = $1 ORDER BY created_at DESC`,
+      `SELECT qr.id, qr.message, qr.status, qr.created_at, qr.assigned_at, qr.converted_at,
+              qr.quotation_id, u.display_name AS assigned_sales_rep_name,
+              q.quote_number, q.status AS quotation_status
+       FROM quote_requests qr
+       LEFT JOIN users u ON u.id = qr.assigned_sales_rep_id
+       LEFT JOIN quotations q ON q.id = qr.quotation_id
+       WHERE qr.customer_id = $1 ORDER BY qr.created_at DESC`,
       [contacts[0].customer_id]
     );
     ok(res, { requests: rows });

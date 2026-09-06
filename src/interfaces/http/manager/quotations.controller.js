@@ -15,7 +15,7 @@ export async function listQuotations(req, res, next) {
     let quotes = all;
     if (!req.user.roles.includes('admin')) {
       const role = req.user.roles.includes('sales_manager') ? 'sales_manager' : 'finance_operations';
-      const { rows } = await pool.query(`SELECT DISTINCT quotation_id FROM negotiation_cases WHERE owner_role=$1 AND status='open' UNION SELECT DISTINCT quotation_id FROM approval_instances WHERE required_role=$1 AND status='pending'`, [role]);
+      const { rows } = await pool.query(`SELECT DISTINCT nc.quotation_id FROM negotiation_cases nc WHERE (nc.owner_role=$1 AND nc.status='open') OR ($1='sales_manager' AND EXISTS(SELECT 1 FROM negotiation_case_events nce WHERE nce.negotiation_case_id=nc.id AND nce.from_role='sales_manager')) UNION SELECT DISTINCT quotation_id FROM approval_instances WHERE required_role=$1 AND status='pending'`, [role]);
       const ids = new Set(rows.map((row) => row.quotation_id));
       quotes = all.filter((quote) => ids.has(quote.id));
     }

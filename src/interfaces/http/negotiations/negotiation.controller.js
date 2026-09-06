@@ -1,21 +1,22 @@
 import { pool } from '../../../infrastructure/database/pool.js';
 import { inTransaction, writeAuditAndOutbox } from '../../../infrastructure/database/transaction.js';
 import { AppError } from '../../../shared/http.js';
-import { createQuoteVersion } from '../../../domains/sales-rep/quotation.service.js';
+import { createQuoteVersion, routeApproval } from '../../../domains/sales-rep/quotation.service.js';
 import { getQuotationById } from '../../../domains/quotations/repository.js';
 
 const editableRole = (principal, role) => principal.roles.includes('admin') || principal.roles.includes(role);
 
 async function getCase(client, quoteId, principal, lock = false) {
   const { rows } = await client.query(
-    `SELECT nc.*, q.owner_user_id, q.lock_version, q.current_version_number, q.customer_id
+    `SELECT nc.*, q.owner_user_id, q.lock_version, q.current_version_number, q.customer_id,
+            EXISTS(SELECT 1 FROM negotiation_case_events nce WHERE nce.negotiation_case_id=nc.id AND nce.from_role='sales_manager') AS manager_forwarded_history
      FROM negotiation_cases nc JOIN quotations q ON q.id=nc.quotation_id
      WHERE nc.quotation_id=$1${lock ? ' FOR UPDATE' : ''}`,
     [quoteId]
   );
   const item = rows[0];
   if (!item) throw new AppError(404, 'NEGOTIATION_NOT_FOUND', 'No active negotiation exists for this quotation.');
-  const canView = principal.roles.includes('admin') || editableRole(principal, item.owner_role) || item.owner_user_id === principal.id;
+  const canView = principal.roles.includes('admin') || editableRole(principal, item.owner_role) || item.owner_user_id === principal.id || (principal.roles.includes('sales_manager') && item.manager_forwarded_history);
   if (!canView) throw new AppError(403, 'FORBIDDEN', 'This negotiation is not assigned to you.');
   return item;
 }
@@ -27,7 +28,7 @@ export async function listCases(req, res, next) {
     const where = roles.includes('admin')
       ? ''
       : roles.includes('sales_manager')
-        ? `WHERE nc.owner_role='sales_manager' AND nc.status='open'`
+        ? `WHERE (nc.owner_role='sales_manager' AND nc.status='open') OR EXISTS(SELECT 1 FROM negotiation_case_events nce WHERE nce.negotiation_case_id=nc.id AND nce.from_role='sales_manager')`
         : roles.includes('finance_operations')
           ? `WHERE nc.owner_role='finance_operations' AND nc.status='open'`
           : `WHERE q.owner_user_id=$1`;
@@ -77,12 +78,15 @@ export async function reviseCase(req, res, next) {
       const { rows: customers } = await client.query(`SELECT c.*,ct.code AS tier_code,COALESCE(ct.entitlement_discount_percent,0) AS entitlement_discount_percent,ct.policy_version AS tier_policy_version FROM customers c LEFT JOIN customer_tiers ct ON ct.id=c.tier_id WHERE c.id=$1`, [item.customer_id]);
       const quotation = { id: item.quotation_id };
       const { version, assessment } = await createQuoteVersion(client, { quotation, customer: customers[0], input, actorUserId: req.principal.id, versionNumber: item.current_version_number + 1 });
-      await client.query(`UPDATE quotations SET current_version_number=$1,lock_version=lock_version+1,status='sent_to_customer',last_activity_at=now(),updated_at=now() WHERE id=$2`, [version.version_number, item.quotation_id]);
+      const nextStatus = await routeApproval(client, {
+        quotation: { id: item.quotation_id }, version, assessment, actorUserId: req.principal.id
+      });
+      await client.query(`UPDATE quotations SET current_version_number=$1,lock_version=lock_version+1,last_activity_at=now(),updated_at=now() WHERE id=$2`, [version.version_number, item.quotation_id]);
       await client.query(`UPDATE negotiation_requests SET status='revised',resolved_at=now() WHERE quotation_id=$1 AND status='open'`, [item.quotation_id]);
-      await client.query(`UPDATE negotiation_cases SET updated_at=now() WHERE id=$1`, [item.id]);
+      await client.query(`UPDATE negotiation_cases SET status='resolved',resolved_at=now(),updated_at=now() WHERE id=$1`, [item.id]);
       await client.query(`INSERT INTO negotiation_case_events(negotiation_case_id,event_type,actor_user_id,quotation_version_number) VALUES($1,'revised_offer_sent',$2,$3)`, [item.id,req.principal.id,version.version_number]);
-      await writeAuditAndOutbox(client,{aggregateType:'quotation',aggregateId:item.quotation_id,eventType:'negotiation.revised_offer_sent',actorUserId:req.principal.id,afterState:{status:'sent_to_customer',ownerRole:item.owner_role},metadata:{versionNumber:version.version_number,caseId:item.id,blendedRiskPercent:assessment.blended_risk_percent}});
-      return { version, status: 'sent_to_customer', owner_role: item.owner_role };
+      await writeAuditAndOutbox(client,{aggregateType:'quotation',aggregateId:item.quotation_id,eventType:'negotiation.revised_offer_sent',actorUserId:req.principal.id,afterState:{status:nextStatus,ownerRole:item.owner_role},metadata:{versionNumber:version.version_number,caseId:item.id,blendedRiskPercent:assessment.blended_risk_percent,route:assessment.route}});
+      return { version, status: nextStatus, owner_role: item.owner_role };
     });
     res.status(201).json({ data: result });
   } catch (error) { next(error); }

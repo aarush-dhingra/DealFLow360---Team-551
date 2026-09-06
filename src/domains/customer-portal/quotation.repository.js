@@ -39,8 +39,10 @@ export async function listPortalQuotes(userEmail, { status, limit = 50, offset =
     `SELECT
        q.id, q.quote_number, q.status, q.current_version_number,
        q.opened_at, q.last_activity_at, nc.owner_role AS negotiation_owner_role, nc.updated_at AS negotiation_handoff_at,
+       COALESCE(q.owner_display_name, u.display_name, 'Sales team') AS assigned_sales_rep_name,
        qv.currency_code, qv.pre_discount_total, qv.net_total, qv.grand_total
      FROM quotations q
+     LEFT JOIN users u ON u.id=q.owner_user_id
      LEFT JOIN negotiation_cases nc ON nc.quotation_id=q.id AND nc.status='open'
      LEFT JOIN quotation_versions qv
        ON qv.quotation_id = q.id AND qv.version_number = q.current_version_number
@@ -61,9 +63,11 @@ export async function getPortalQuotation(userEmail, quotationId) {
     `SELECT
        q.id, q.quote_number, q.status, q.current_version_number, q.lock_version,
        q.opened_at, q.last_activity_at, nc.owner_role AS negotiation_owner_role, nc.updated_at AS negotiation_handoff_at,
+       COALESCE(q.owner_display_name, u.display_name, 'Sales team') AS assigned_sales_rep_name,
        c.legal_name AS customer_name
      FROM quotations q
      JOIN customers c ON c.id = q.customer_id
+     LEFT JOIN users u ON u.id=q.owner_user_id
      LEFT JOIN negotiation_cases nc ON nc.quotation_id=q.id AND nc.status='open'
      WHERE q.id = $1 AND q.customer_id = $2
        AND q.status NOT IN ('draft', 'cancelled', 'superseded')`,
