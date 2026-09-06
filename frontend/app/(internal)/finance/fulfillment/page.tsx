@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useLiveUpdates } from '@/lib/useLiveUpdates';
 import { useRoleGuard } from '@/lib/useRoleGuard';
 import { PageHeader, Badge, Button, Card, Table, Tr, Td } from '@/components/ui';
 
@@ -43,7 +44,7 @@ export default function FinanceFulfillmentPage() {
   const [acting, setActing] = useState(false);
   const [actionResult, setActionResult] = useState<Record<string, { message: string; isError: boolean }>>({});
 
-  useEffect(() => {
+  const loadQueue = useCallback(() => {
     api.get<{ data: { quotations: Quote[] } }>('/finance/fulfillment/queue')
       .then((queue) => {
         setQuotes(queue.data.quotations ?? []);
@@ -51,6 +52,8 @@ export default function FinanceFulfillmentPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+  useEffect(() => { loadQueue(); }, [loadQueue]);
+  useLiveUpdates(loadQueue);
 
   async function selectQuote(quoteId: string) {
     if (selected === quoteId) { setSelected(null); setPlan(null); return; }
