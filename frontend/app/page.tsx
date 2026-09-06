@@ -215,7 +215,10 @@ export default function LoginPage() {
                       {showPassword ? <EyeOff /> : <Eye />}
                     </button>
                   </div>
-                  {passErr && <p className="mt-1 text-xs text-red-500">{passErr}</p>}
+                  {passErr
+                    ? <p className="mt-1 text-xs text-red-500">{passErr}</p>
+                    : tab === 'customerSignup' && <p className="mt-1 text-xs text-gray-400">Min. 6 chars · uppercase · lowercase · symbol</p>
+                  }
                 </div>
                 <button type="submit" disabled={loading}
                   className="w-full bg-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-brand-dim transition-colors disabled:opacity-60">
