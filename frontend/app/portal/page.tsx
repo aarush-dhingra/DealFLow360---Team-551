@@ -15,6 +15,7 @@ type Quote = {
   last_activity_at: string;
   lock_version?: number;
   negotiation_owner_role?: string | null;
+  negotiation_case_status?: string | null;
   negotiation_handoff_at?: string | null;
   assigned_sales_rep_name?: string | null;
 };
@@ -45,7 +46,7 @@ type NegotiationRequest = {
   line_requests: Array<{ line_id: string; product_name: string; comment: string }>;
 };
 
-type QuoteRequest = { id: string; message: string; status: string; created_at: string; assigned_sales_rep_name?: string | null; quote_number?: string | null; quotation_id?: string | null; quotation_status?: string | null };
+type QuoteRequest = { id: string; message: string; status: string; created_at: string; assigned_at?: string | null; converted_at?: string | null; assigned_sales_rep_name?: string | null; quote_number?: string | null; quotation_id?: string | null; quotation_status?: string | null };
 type TierProgress = {
   tier_code?: string;
   tier_name?: string;
@@ -86,6 +87,7 @@ export default function CustomerPortalHome() {
   // Quote request state
   const [requestMsg, setRequestMsg] = useState('');
   const [myRequests, setMyRequests] = useState<QuoteRequest[]>([]);
+  const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<QuoteRequest | null>(null);
   const [requestSending, setRequestSending] = useState(false);
   const [requestDone, setRequestDone] = useState('');
 
@@ -115,7 +117,9 @@ export default function CustomerPortalHome() {
   useLiveUpdates(loadQuotes);
   useLiveUpdates(loadRequests);
 
-  const hasOpenNegotiation = (quote: Quote | Detail) => Boolean(quote.negotiation_owner_role);
+  const hasOpenNegotiation = (quote: Quote | Detail) => quote.negotiation_case_status === 'open' || quote.status === 'under_negotiation';
+
+  const openNegotiationCount = useMemo(() => quotes.filter(hasOpenNegotiation).length, [quotes]);
 
   const visible = useMemo(() =>
     quotes.filter((q) =>
@@ -140,6 +144,7 @@ export default function CustomerPortalHome() {
         api.get<{ requests: NegotiationRequest[] }>(`/portal/quotes/${q.id}/negotiation-requests`).catch(() => ({ requests: [] })),
       ]);
       setSelected(detail.quote);
+      setSelectedQuoteRequest(null);
       setInitialOffer(original.version);
       setNegotiationRequests(requests.requests);
       setMessage('');
@@ -195,6 +200,7 @@ export default function CustomerPortalHome() {
       setRequestMsg('');
       setRequestDone('Request sent. Your assigned sales representative will prepare an initial offer.');
       setMyRequests((items) => [result.request, ...items.filter((item) => item.id !== result.request.id)]);
+      setSelectedQuoteRequest(result.request);
       loadRequests();
       setTab('outstanding');
     } catch (e: unknown) {
@@ -255,7 +261,7 @@ export default function CustomerPortalHome() {
               onClick={() => setTab(key)}
               className={`px-4 py-2 text-sm ${tab === key ? 'border-b-2 border-brand text-brand font-medium' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              {label}
+              {label}{key === 'negotiations' && openNegotiationCount > 0 ? ` (${openNegotiationCount})` : ''}
             </button>
           ))}
         </div>
@@ -289,7 +295,8 @@ export default function CustomerPortalHome() {
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Your previous requests</h3>
                 <div className="space-y-2">
                   {myRequests.map((r) => (
-                    <Card key={r.id} className="p-4">
+                    <button key={r.id} type="button" onClick={() => { setSelectedQuoteRequest(r); setTab('outstanding'); }} className="block w-full text-left">
+                    <Card className="p-4 hover:border-brand hover:shadow-sm transition-all">
                       <div className="flex justify-between gap-3">
                         <p className="text-sm text-gray-700 flex-1">{r.message}</p>
                         <div className="text-right shrink-0">
@@ -304,6 +311,7 @@ export default function CustomerPortalHome() {
                         {r.quote_number ? ` · Quotation ${r.quote_number} created` : ''}
                       </p>
                     </Card>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -315,7 +323,8 @@ export default function CustomerPortalHome() {
             {/* Left: quote list */}
             <section className="space-y-3">
               {tab === 'outstanding' && outstandingRequests.map((request) => (
-                <Card key={request.id} className="border-brand-100 bg-brand-50 p-4">
+                <button key={request.id} type="button" onClick={() => { setSelectedQuoteRequest(request); setSelected(null); }} className="block w-full text-left">
+                <Card className={`border-brand-100 bg-brand-50 p-4 transition-all hover:border-brand hover:shadow-sm ${selectedQuoteRequest?.id === request.id ? 'ring-1 ring-brand' : ''}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-medium text-gray-900">Quotation request in progress</p>
@@ -328,6 +337,7 @@ export default function CustomerPortalHome() {
                     <Badge variant="blue">{request.quotation_id ? 'Offer in approval' : 'Assigned'}</Badge>
                   </div>
                 </Card>
+                </button>
               ))}
               {visible.length === 0 && !(tab === 'outstanding' && outstandingRequests.length > 0) ? (
                 <Card className="p-5 text-sm text-gray-500">No {tab} orders.</Card>
@@ -358,7 +368,16 @@ export default function CustomerPortalHome() {
 
             {/* Right: detail + negotiation */}
             <section>
-              {selected ? (
+              {selectedQuoteRequest ? (
+                <Card className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div><h2 className="font-semibold text-gray-900">Quotation request</h2><p className="mt-1 text-sm text-gray-500">Submitted {new Date(selectedQuoteRequest.created_at).toLocaleString()}</p></div>
+                    <Badge variant={selectedQuoteRequest.quotation_id ? 'blue' : 'yellow'}>{selectedQuoteRequest.quotation_id ? 'Offer in progress' : 'Assigned'}</Badge>
+                  </div>
+                  <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4"><p className="text-xs font-medium uppercase tracking-wide text-gray-500">Your request</p><p className="mt-2 whitespace-pre-wrap text-sm text-gray-800">{selectedQuoteRequest.message}</p></div>
+                  <div className="mt-4 space-y-2 text-sm text-gray-700"><p>Assigned sales rep: <span className="font-semibold text-gray-900">{selectedQuoteRequest.assigned_sales_rep_name ?? 'Assigning now'}</span></p><p>{selectedQuoteRequest.quotation_id ? 'Your rep is preparing the offer. It will appear here as soon as it is ready for review.' : 'Your rep has received this request and will prepare the initial offer.'}</p></div>
+                </Card>
+              ) : selected ? (
                 <Card className="p-5">
                   <div className="flex justify-between gap-3 mb-4">
                     <div>
