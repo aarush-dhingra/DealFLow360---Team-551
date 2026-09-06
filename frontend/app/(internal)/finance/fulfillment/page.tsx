@@ -97,6 +97,17 @@ export default function FinanceFulfillmentPage() {
     }
   }
 
+  async function ship(quoteId: string) {
+    setActing(true);
+    try {
+      await api.post(`/finance/fulfillment/quotations/${quoteId}/ship`, {});
+      setActionResult((r) => ({ ...r, [quoteId]: { message: 'Shipment confirmed. On-hand stock was deducted from the allocated warehouses.', isError: false } }));
+      setQuotes((qs) => qs.map((q) => q.id === quoteId ? { ...q, status: 'fulfilled' } : q));
+    } catch (err: unknown) {
+      setActionResult((r) => ({ ...r, [quoteId]: { message: err instanceof Error ? err.message : 'Shipment could not be confirmed.', isError: true } }));
+    } finally { setActing(false); }
+  }
+
   return (
     <div>
       <PageHeader title="Fulfillment" subtitle="Allocate approved quotes to warehouse stock" />
@@ -181,9 +192,7 @@ export default function FinanceFulfillmentPage() {
                               </Button>
                             )}
                             {q.status === 'in_fulfillment' && (
-                              <Button variant="secondary" onClick={() => consolidate(q.id)} disabled={acting}>
-                                Consolidate Backorders
-                              </Button>
+                              <><Button variant="secondary" onClick={() => consolidate(q.id)} disabled={acting}>Consolidate Backorders</Button><Button variant="primary" onClick={() => ship(q.id)} disabled={acting}>Confirm shipment</Button></>
                             )}
                           </div>
                         </div>

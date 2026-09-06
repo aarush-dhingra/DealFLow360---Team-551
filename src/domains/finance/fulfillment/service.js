@@ -235,6 +235,48 @@ async function writeAudit(
   });
   await audit.flush();
   await outbox.flush();
+  client.realtimeChanges?.push({ aggregateType: 'fulfillment_order', aggregateId: orderId, quotationId, eventType });
+}
+
+/**
+ * Commit the physical shipment for a fully allocated order. Allocation only
+ * reserves stock; shipping is the irreversible point where on-hand inventory
+ * is reduced. Backordered orders must be consolidated before they can ship.
+ */
+export async function shipFulfillment({ quotationId, principal }) {
+  return withTransaction(async (client) => {
+    const quote = await repo.lockQuote(client, quotationId);
+    if (!quote) throw Errors.notFound('Quotation not found.');
+    const liveOrder = await repo.findLiveOrder(client, quotationId);
+    if (!liveOrder) throw Errors.invalidTransition('No fulfillment order exists for this quotation.');
+    const order = await repo.lockOrder(client, liveOrder.id);
+    if (!order || order.status !== 'allocated') {
+      throw Errors.invalidTransition('Only a fully allocated order can be shipped. Consolidate any backorders first.');
+    }
+    const allocations = await repo.findOrderAllocations(client, order.id);
+    const allocated = allocations.filter((allocation) => allocation.status === 'allocated');
+    if (allocated.length === 0) throw Errors.invalidTransition('This order has no allocated stock to ship.');
+    for (const allocation of allocated) {
+      const consumed = await repo.consumeReservedStock(client, {
+        warehouseId: allocation.warehouseId,
+        productId: allocation.productId,
+        quantity: allocation.quantity
+      });
+      if (!consumed) throw Errors.insufficientStock('Reserved stock changed concurrently; reload and try again.');
+    }
+    await repo.markAllocationsShipped(client, order.id);
+    await repo.updateOrderState(client, { id: order.id, status: 'shipped', allocationMode: order.allocationMode });
+    const advanced = await repo.updateQuoteStatus(client, { quotationId, status: 'fulfilled', expectedLockVersion: quote.lockVersion });
+    if (!advanced) throw Errors.staleVersion('Quotation changed concurrently; reload and retry.');
+    const audit = new AuditCollector(client);
+    const outbox = new OutboxCollector(client);
+    audit.record({ aggregateType: 'fulfillment_order', aggregateId: order.id, quotationId, eventType: 'fulfillment.shipped', actorUserId: principal.userId, requestId: principal.requestId ?? null, beforeState: { orderStatus: order.status, quoteStatus: quote.status }, afterState: { orderStatus: 'shipped', quoteStatus: 'fulfilled' }, metadata: { allocationCount: allocated.length } });
+    outbox.record({ aggregateType: 'fulfillment_order', aggregateId: order.id, eventType: 'fulfillment.shipped', payload: { quotationId, orderId: order.id, allocationCount: allocated.length } });
+    await audit.flush();
+    await outbox.flush();
+    client.realtimeChanges?.push({ aggregateType: 'fulfillment_order', aggregateId: order.id, quotationId, eventType: 'fulfillment.shipped' });
+    return { quotationId, fulfillmentOrderId: order.id, status: 'fulfilled', shippedAllocations: allocated.length };
+  });
 }
 
 /**
@@ -354,6 +396,7 @@ export async function consolidateBackorders({ quotationId, principal }) {
     });
     await audit.flush();
     await outbox.flush();
+    client.realtimeChanges?.push({ aggregateType: 'fulfillment_order', aggregateId: order.id, quotationId, eventType: 'fulfillment.backorder_consolidated' });
 
     return {
       quotationId,

@@ -115,6 +115,17 @@ const RELEASE_STOCK = `
   WHERE warehouse_id = $1 AND product_id = $2
 `;
 
+const CONSUME_STOCK = `
+  UPDATE inventory_levels
+  SET quantity_on_hand = quantity_on_hand - $3,
+      quantity_reserved = quantity_reserved - $3
+  WHERE warehouse_id = $1
+    AND product_id = $2
+    AND quantity_on_hand >= $3
+    AND quantity_reserved >= $3
+  RETURNING warehouse_id
+`;
+
 const UPDATE_ORDER_STATE = `
   UPDATE fulfillment_orders
   SET status = $2,
@@ -178,6 +189,13 @@ const CANCEL_ALLOCATION = `
   UPDATE fulfillment_allocations
   SET status = 'cancelled'
   WHERE id = $1
+  RETURNING id
+`;
+
+const MARK_ALLOCATIONS_SHIPPED = `
+  UPDATE fulfillment_allocations
+  SET status='shipped'
+  WHERE fulfillment_order_id=$1 AND status='allocated'
   RETURNING id
 `;
 
@@ -248,6 +266,11 @@ export async function releaseStock(client, { warehouseId, productId, quantity })
   await client.query(RELEASE_STOCK, [warehouseId, productId, quantity]);
 }
 
+export async function consumeReservedStock(client, { warehouseId, productId, quantity }) {
+  const { rowCount } = await client.query(CONSUME_STOCK, [warehouseId, productId, quantity]);
+  return rowCount === 1;
+}
+
 export async function updateOrderState(client, { id, status, allocationMode }) {
   const { rows } = await client.query(UPDATE_ORDER_STATE, [id, status, allocationMode]);
   return rows[0] ?? null;
@@ -271,6 +294,11 @@ export async function findOrderAllocations(client, fulfillmentOrderId) {
 export async function cancelAllocation(client, allocationId) {
   const { rows } = await client.query(CANCEL_ALLOCATION, [allocationId]);
   return rows[0] ?? null;
+}
+
+export async function markAllocationsShipped(client, fulfillmentOrderId) {
+  const { rowCount } = await client.query(MARK_ALLOCATIONS_SHIPPED, [fulfillmentOrderId]);
+  return rowCount;
 }
 
 export async function findBackorders(client, fulfillmentOrderId) {

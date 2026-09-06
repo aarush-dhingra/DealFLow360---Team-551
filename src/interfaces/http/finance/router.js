@@ -14,6 +14,7 @@ import {
   previewPlanController,
   fulfillmentQueueController,
   allocateFulfillmentController,
+  shipFulfillmentController,
   consolidateBackordersController
 } from './fulfillment.controller.js';
 import { applyPaymentController, voidInvoiceController } from './payments.controller.js';
@@ -82,6 +83,12 @@ financeRouter.post(
   '/credit-notes/:creditNoteId/apply',
   requireFinance,
   applyCreditNoteController
+);
+
+financeRouter.post(
+  '/fulfillment/quotations/:quotationId/ship',
+  requireFinance,
+  shipFulfillmentController
 );
 
 financeRouter.get('/inventory', requireFinance, getInventoryWorkspace);
